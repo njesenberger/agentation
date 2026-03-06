@@ -25,7 +25,7 @@ import {
   getEventsSince,
 } from "./store.js";
 import { eventBus } from "./events.js";
-import type { Annotation, AFSEvent, ActionRequest } from "../types.js";
+import type { Annotation, AFSEvent, ActionRequest, AgentStatusPayload } from "../types.js";
 
 /**
  * Log to stderr so diagnostic output never corrupts the MCP stdio channel.
@@ -166,6 +166,199 @@ function sendWebhooks(actionRequest: ActionRequest): void {
     `[Webhook] Fired ${webhookUrls.length} webhook(s) for session ${actionRequest.sessionId}`
   );
 }
+
+// -----------------------------------------------------------------------------
+// Agent Status (ephemeral, in-memory)
+// -----------------------------------------------------------------------------
+
+let agentStatus: AgentStatusPayload | null = null;
+let agentStatusTimeout: ReturnType<typeof setTimeout> | null = null;
+
+const AGENT_STATUS_TIMEOUT_MS = 30_000; // Auto-clear after 30s of no updates
+const AGENT_STOPPED_CLEAR_MS = 1_500; // Clear "finished" status after 1.5s
+
+/**
+ * Parse a Claude Code hook JSON payload into an AgentStatusPayload.
+ * Accepts both raw hook JSON (with hook_event_name) and simplified payloads.
+ */
+/**
+ * Summarize a Bash command into something meaningful for a designer watching.
+ * Returns null if the command isn't worth showing.
+ */
+function summarizeBashCommand(command: string): string | null {
+  const cmd = command.trim();
+
+  // Build commands
+  if (/\b(pnpm|npm|yarn|bun)\s+(build|run build)/.test(cmd)) return "Building project";
+  if (/\b(pnpm|npm|yarn|bun)\s+(dev|run dev|start)/.test(cmd)) return "Starting dev server";
+  if (/\b(pnpm|npm|yarn|bun)\s+install/.test(cmd)) return "Installing dependencies";
+  if (/\b(pnpm|npm|yarn|bun)\s+(test|run test)/.test(cmd)) return "Running tests";
+  if (/\btsc\b/.test(cmd)) return "Type-checking";
+
+  // Not useful to show — git, curl, grep, ls, etc. are just the agent thinking
+  return null;
+}
+
+/**
+ * Summarize an Agentation MCP tool call for the toolbar.
+ */
+function summarizeAgentationTool(toolName: string, toolInput: Record<string, unknown> | undefined): string | null {
+  const shortName = toolName.replace("mcp__agentation__agentation_", "");
+  switch (shortName) {
+    case "get_all_pending":
+    case "get_pending":
+      return "Reviewing annotations";
+    case "watch_annotations":
+      return "Watching for annotations";
+    case "resolve":
+      return "Resolving annotation";
+    case "reply":
+      return "Replying to annotation";
+    case "acknowledge":
+      return "Acknowledging annotation";
+    case "dismiss":
+      return "Dismissing annotation";
+    case "list_sessions":
+    case "get_session":
+      return null; // Internal plumbing, not interesting
+    default:
+      return null;
+  }
+}
+
+function parseAgentStatusPayload(body: Record<string, unknown>): AgentStatusPayload | null {
+  const hookEvent = body.hook_event_name as string | undefined;
+  const now = new Date().toISOString();
+
+  if (hookEvent) {
+    const toolName = body.tool_name as string | undefined;
+    const toolInput = body.tool_input as Record<string, unknown> | undefined;
+
+    switch (hookEvent) {
+      case "PostToolUse": {
+        // Only surface file edits and meaningful bash commands
+        if (toolName === "Edit" || toolName === "Write") {
+          const filePath = toolInput?.file_path as string | undefined;
+          const fileName = filePath ? filePath.split("/").pop() : "a file";
+          return { event: "tool_use", summary: `Editing ${fileName}`, active: true, tool_name: toolName, timestamp: now };
+        }
+        if (toolName === "Bash") {
+          const command = toolInput?.command as string | undefined;
+          const summary = command ? summarizeBashCommand(command) : null;
+          if (summary) return { event: "tool_use", summary, active: true, tool_name: toolName, timestamp: now };
+        }
+        // Agentation MCP tools — show annotation activity
+        if (toolName?.startsWith("mcp__agentation__")) {
+          const summary = summarizeAgentationTool(toolName, toolInput);
+          if (summary) return { event: "tool_use", summary, active: true, tool_name: toolName, timestamp: now };
+        }
+        // Read, Glob, Grep, Agent, etc. — skip, it's just the agent thinking
+        return null;
+      }
+      case "PostToolUseFailure": {
+        const errorMsg = body.error as string | undefined;
+        const summary = errorMsg
+          ? `Error: ${errorMsg.slice(0, 60)}${errorMsg.length > 60 ? "…" : ""}`
+          : "Something failed";
+        return { event: "error", summary, active: true, tool_name: toolName, timestamp: now };
+      }
+      case "Stop":
+        return { event: "stopped", summary: "Finished", active: false, timestamp: now };
+      case "SessionEnd":
+        return { event: "stopped", summary: "Session ended", active: false, timestamp: now };
+      case "PermissionRequest": {
+        // PermissionRequest gives us tool_name + tool_input for richer context
+        let summary = "Needs permission";
+        if (toolName === "Edit" || toolName === "Write") {
+          const filePath = toolInput?.file_path as string | undefined;
+          const fileName = filePath ? filePath.split("/").pop() : undefined;
+          summary = fileName ? `Needs permission to edit ${fileName}` : "Needs permission to edit";
+        } else if (toolName === "Bash") {
+          summary = "Needs permission to run command";
+        }
+        return { event: "notification", summary, active: true, tool_name: toolName, timestamp: now };
+      }
+      // PreToolUse, SessionStart, Notification — not useful to show
+      default:
+        return null;
+    }
+  }
+
+  // Simplified AgentStatusPayload format (direct callers)
+  if (body.event && body.summary) {
+    return {
+      event: body.event as AgentStatusPayload["event"],
+      summary: body.summary as string,
+      active: body.active !== false,
+      tool_name: body.tool_name as string | undefined,
+      notification_type: body.notification_type as string | undefined,
+      timestamp: (body.timestamp as string) || now,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * POST /agent-status
+ * Receives Claude Code hook events and broadcasts agent activity via SSE.
+ */
+const postAgentStatusHandler: RouteHandler = async (req, res) => {
+  let body: Record<string, unknown>;
+  try {
+    body = await parseBody<Record<string, unknown>>(req);
+  } catch {
+    return sendError(res, 400, "Invalid JSON body");
+  }
+
+  const payload = parseAgentStatusPayload(body);
+  if (!payload) {
+    return sendError(res, 400, "Could not parse agent status from payload");
+  }
+
+  // Update in-memory state
+  agentStatus = payload;
+
+  // Reset auto-clear timeout
+  if (agentStatusTimeout) clearTimeout(agentStatusTimeout);
+
+  if (payload.active) {
+    // Auto-clear after 30s if no new updates (handles agent crash)
+    agentStatusTimeout = setTimeout(() => {
+      agentStatus = null;
+      eventBus.emit("agent.stopped", "__global__", {
+        event: "stopped",
+        summary: "Timed out",
+        active: false,
+        timestamp: new Date().toISOString(),
+      } satisfies AgentStatusPayload);
+    }, AGENT_STATUS_TIMEOUT_MS);
+
+    // Broadcast activity
+    eventBus.emit("agent.activity", "__global__", payload);
+  } else {
+    // Agent stopped — broadcast then clear after delay
+    eventBus.emit("agent.stopped", "__global__", payload);
+    agentStatusTimeout = setTimeout(() => {
+      agentStatus = null;
+    }, AGENT_STOPPED_CLEAR_MS);
+  }
+
+  // Return suppressOutput so it doesn't show in Claude's verbose mode
+  sendJson(res, 200, { suppressOutput: true });
+};
+
+/**
+ * GET /agent-status
+ * Returns current agent activity state for toolbar initial load.
+ */
+const getAgentStatusHandler: RouteHandler = async (_req, res) => {
+  if (agentStatus) {
+    sendJson(res, 200, agentStatus);
+  } else {
+    sendJson(res, 200, { active: false });
+  }
+};
 
 // -----------------------------------------------------------------------------
 // Request Helpers
@@ -571,8 +764,13 @@ const sseHandler: RouteHandler = async (req, res, params) => {
     }
   }
 
-  // Subscribe to new events
-  const unsubscribe = eventBus.subscribeToSession(sessionId, (event: AFSEvent) => {
+  // Subscribe to session events
+  const unsubscribeSession = eventBus.subscribeToSession(sessionId, (event: AFSEvent) => {
+    sendSSEEvent(res, event);
+  });
+
+  // Also subscribe to global events (agent activity) via __global__ session
+  const unsubscribeGlobal = eventBus.subscribeToSession("__global__", (event: AFSEvent) => {
     sendSSEEvent(res, event);
   });
 
@@ -584,7 +782,8 @@ const sseHandler: RouteHandler = async (req, res, params) => {
   // Clean up on disconnect
   req.on("close", () => {
     clearInterval(keepAlive);
-    unsubscribe();
+    unsubscribeSession();
+    unsubscribeGlobal();
     sseConnections.delete(res);
     agentConnections.delete(res);
   });
@@ -921,6 +1120,14 @@ function matchRoute(
 // Server
 // -----------------------------------------------------------------------------
 
+// Track whether the HTTP server started successfully
+let httpServerUp = false;
+let httpServerError: string | null = null;
+
+export function getHttpServerStatus(): { up: boolean; error: string | null } {
+  return { up: httpServerUp, error: httpServerError };
+}
+
 /**
  * Create and start the HTTP server.
  * @param port - Port to listen on
@@ -964,6 +1171,12 @@ export function startHttpServer(port: number, apiKey?: string): void {
       });
     }
 
+    // Agent status endpoints (always local - ephemeral in-memory state)
+    if (pathname === "/agent-status") {
+      if (method === "POST") return postAgentStatusHandler(req, res, {});
+      if (method === "GET") return getAgentStatusHandler(req, res, {});
+    }
+
     // MCP protocol endpoint (always local - allows Claude Code to connect)
     if (pathname === "/mcp") {
       return handleMcp(req, res);
@@ -990,13 +1203,32 @@ export function startHttpServer(port: number, apiKey?: string): void {
 
   server.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE") {
-      log(`[HTTP] Port ${port} already in use — skipping HTTP server (MCP stdio still active)`);
+      log(`[HTTP] Port ${port} already in use — checking if existing server is agentation...`);
+      // Check if the existing server is an agentation instance we can reuse
+      fetch(`http://localhost:${port}/health`)
+        .then((res) => res.json())
+        .then((data: unknown) => {
+          const health = data as Record<string, unknown>;
+          if (health?.status === "ok") {
+            httpServerUp = true;
+            log(`[HTTP] Found existing agentation server on port ${port} — reusing it`);
+          } else {
+            httpServerError = `Port ${port} is in use by another application. Run: lsof -i :${port} to find it.`;
+            log(`[HTTP] Port ${port} is in use by a non-agentation process`);
+          }
+        })
+        .catch(() => {
+          httpServerError = `Port ${port} is in use and not responding. Run: lsof -i :${port} to find it.`;
+          log(`[HTTP] Port ${port} is in use and not responding to health check`);
+        });
     } else {
+      httpServerError = err.message;
       log(`[HTTP] Server error: ${err.message}`);
     }
   });
 
   server.listen(port, () => {
+    httpServerUp = true;
     if (isCloudMode()) {
       log(`[HTTP] Agentation server listening on http://localhost:${port} (cloud mode)`);
     } else {

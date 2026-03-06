@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "agentation": {
+      "command": "node",
+      "args": [
+        "/Users/stevesmith/Projects/benji-agentation/agentation/mcp/dist/cli.js",
+        "server"
+      ]
+    }
+  }
+}

@@ -1,0 +1,2 @@
+[  190190ms] [ERROR] Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ http://agentation.localhost:1355/deep-select:0
+[  190291ms] [ERROR] Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ http://agentation.localhost:1355/favicon.ico:0

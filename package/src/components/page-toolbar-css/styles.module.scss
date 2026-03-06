@@ -68,6 +68,49 @@
   }
 }
 
+@keyframes editPulseGlow {
+  0% {
+    box-shadow: 0 4px 20px rgba(74, 158, 255, 0);
+    transform: scale(1);
+  }
+  40% {
+    box-shadow: 0 4px 24px rgba(74, 158, 255, 0.45);
+    transform: scale(1.05);
+  }
+  100% {
+    box-shadow: 0 4px 20px rgba(74, 158, 255, 0);
+    transform: scale(1);
+  }
+}
+
+@keyframes resolvePulseGlow {
+  0% {
+    box-shadow: 0 4px 20px rgba(52, 199, 89, 0);
+    transform: rotate(0deg) scale(1);
+  }
+  10% {
+    box-shadow: 0 4px 24px rgba(52, 199, 89, 0.4);
+    transform: rotate(-2.5deg) scale(1.02);
+  }
+  25% {
+    transform: rotate(2deg) scale(1.02);
+  }
+  40% {
+    transform: rotate(-1.5deg) scale(1.01);
+  }
+  55% {
+    transform: rotate(0.8deg) scale(1);
+  }
+  70% {
+    box-shadow: 0 4px 24px rgba(52, 199, 89, 0.1);
+    transform: rotate(-0.3deg) scale(1);
+  }
+  100% {
+    box-shadow: 0 4px 20px rgba(52, 199, 89, 0);
+    transform: rotate(0deg) scale(1);
+  }
+}
+
 @keyframes badgeEnter {
   from {
     opacity: 0;
@@ -122,6 +165,33 @@
     transform: scale(0.85) translateY(8px);
   }
 }
+
+@keyframes markerIn {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes markerOut {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+}
+
 
 @keyframes fadeIn {
   from {
@@ -228,6 +298,16 @@
   &.hiding {
     animation: toolbarHide 0.4s cubic-bezier(0.4, 0, 1, 1) forwards;
     pointer-events: none;
+  }
+
+  // Brief pulse when agent edits a file (visual confirmation)
+  &.editPulse {
+    animation: editPulseGlow 0.6s ease both;
+  }
+
+  // Green wiggle when annotation is resolved
+  &.resolvePulse {
+    animation: resolvePulseGlow 0.85s linear both;
   }
 
   &.collapsed {
@@ -512,6 +592,215 @@
     opacity: 0;
     transform: scale(0);
     animation: none;
+  }
+
+  // Agent actively working — blue with faster pulse
+  &.agentActive {
+    background: #4a9eff;
+    animation: agentActivityPulse 1.2s ease-in-out infinite;
+  }
+
+  // Agent error — red with pulse
+  &.agentError {
+    background: #ff453a;
+    animation: agentErrorPulse 1s ease-in-out infinite;
+  }
+}
+
+// Agent activity pulse — faster and blue to distinguish from connected green
+@keyframes agentActivityPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(74, 158, 255, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(74, 158, 255, 0);
+  }
+}
+
+@keyframes agentErrorPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 69, 58, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(255, 69, 58, 0);
+  }
+}
+
+// Agent activity floating label
+.agentActivityLabel {
+  position: absolute;
+  padding: 6px 10px;
+  background: #1a1a1a;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 8px;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  z-index: 100001;
+
+  // On collapsed FAB: to the left, vertically centered (extra gap clears the badge)
+  &.onFab {
+    right: calc(100% + 20px);
+    top: 50%;
+    transform: translateY(-50%);
+    animation: agentLabelSlideIn 0.2s cubic-bezier(0.19, 1, 0.22, 1) both;
+  }
+
+  // On expanded toolbar: above the toolbar, right-aligned
+  &.onToolbar {
+    bottom: calc(100% + 14px);
+    right: 0;
+    animation: slideUp 0.2s cubic-bezier(0.19, 1, 0.22, 1) both;
+
+    // Arrow pointing down
+    &::after {
+      content: "";
+      position: absolute;
+      top: calc(100% - 4px);
+      right: 16px;
+      transform: rotate(45deg);
+      width: 8px;
+      height: 8px;
+      background: #1a1a1a;
+      border-radius: 0 0 2px 0;
+    }
+  }
+
+  &.exiting {
+    animation: slideDown 0.15s ease both;
+
+    &.onFab {
+      animation: agentLabelSlideOut 0.15s ease both;
+    }
+  }
+
+  &.light {
+    background: #f0f0f0;
+    color: rgba(0, 0, 0, 0.85);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+
+    &.onToolbar::after {
+      background: #f0f0f0;
+    }
+  }
+}
+
+@keyframes agentLabelSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+@keyframes agentLabelSlideOut {
+  from {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-50%) translateX(8px);
+  }
+}
+
+// Text-swap animation on label content change
+.agentActivityLabel.swapping .agentActivityLabelText {
+  animation: textSwap 0.15s ease both;
+}
+
+@keyframes textSwap {
+  0% { opacity: 1; transform: translateY(0); }
+  50% { opacity: 0; transform: translateY(-4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+// Inner text wrapper for label content
+.agentActivityLabelText {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+// Pulsing dot to indicate in-progress work (PreToolUse)
+.activityDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.7;
+  animation: activityDotPulse 1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes activityDotPulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+// Progress count (e.g. "2/5")
+.progressCount {
+  opacity: 0.5;
+  font-size: 11px;
+  margin-left: 2px;
+  font-variant-numeric: tabular-nums;
+  display: inline-block;
+
+  &.progressBump {
+    animation: progressBump 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes progressBump {
+  0% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+}
+
+// Inline agent status dot (for settings panel)
+.agentActiveInline {
+  background: #4a9eff !important;
+}
+
+.agentErrorInline {
+  background: #ff453a !important;
+}
+
+// Error variant of the activity label
+.agentActivityLabel.error {
+  background: rgba(255, 69, 58, 0.9);
+  color: #fff;
+
+  &.onToolbar::after {
+    background: rgba(255, 69, 58, 0.9);
+  }
+
+  &.light {
+    background: rgba(255, 69, 58, 0.12);
+    color: #ff453a;
+
+    &.onToolbar::after {
+      background: rgba(255, 69, 58, 0.12);
+    }
   }
 }
 
@@ -939,7 +1228,7 @@
   }
 
   &.exit {
-    animation: markerOut 0.2s ease-out both;
+    animation: markerOut 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
     pointer-events: none;
   }
 

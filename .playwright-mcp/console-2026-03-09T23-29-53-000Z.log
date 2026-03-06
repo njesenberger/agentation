@@ -1,0 +1,36 @@
+[   84617ms] [ERROR] `DialogContent` requires a `DialogTitle` for the component to be accessible for screen reader users.
+
+If you want to hide the `DialogTitle`, you can wrap it with our VisuallyHidden component.
+
+For more information, see https://radix-ui.com/primitives/docs/components/dialog @ webpack-internal:///(app-pages-browser)/../../node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1_sass@1.97.3/node_modules/next/dist/client/app-index.js:32
+[   84617ms] [WARNING] Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}. @ webpack-internal:///(app-pages-browser)/../../node_modules/.pnpm/@radix-ui+react-dialog@1.1.15_@types+react-dom@18.3.7_@types+react@18.3.28__@types+reac_9cd126aa2880bf880e57e64087c058d6/node_modules/@radix-ui/react-dialog/dist/index.mjs:467
+[   84618ms] [ERROR] `DialogContent` requires a `DialogTitle` for the component to be accessible for screen reader users.
+
+If you want to hide the `DialogTitle`, you can wrap it with our VisuallyHidden component.
+
+For more information, see https://radix-ui.com/primitives/docs/components/dialog @ webpack-internal:///(app-pages-browser)/../../node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1_sass@1.97.3/node_modules/next/dist/client/app-index.js:32
+[   84618ms] [WARNING] Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}. @ webpack-internal:///(app-pages-browser)/../../node_modules/.pnpm/@radix-ui+react-dialog@1.1.15_@types+react-dom@18.3.7_@types+react@18.3.28__@types+reac_9cd126aa2880bf880e57e64087c058d6/node_modules/@radix-ui/react-dialog/dist/index.mjs:467
+[   84622ms] [WARNING] Blocked aria-hidden on an element because its descendant retained focus. The focus must not be hidden from assistive technology users. Avoid using aria-hidden on a focused element or its ancestor. Consider using the inert attribute instead, which will also prevent focus. For more details, see the aria-hidden section of the WAI-ARIA specification at https://w3c.github.io/aria/#aria-hidden.
+Element with focus: <button>
+Ancestor with aria-hidden: <main.main-content> @ http://localhost:3003/test-modals:0
+[   89725ms] [WARNING] Blocked aria-hidden on an element because its descendant retained focus. The focus must not be hidden from assistive technology users. Avoid using aria-hidden on a focused element or its ancestor. Consider using the inert attribute instead, which will also prevent focus. For more details, see the aria-hidden section of the WAI-ARIA specification at https://w3c.github.io/aria/#aria-hidden.
+Element with focus: <div.styles-module__toolbarContainer___dIhma  styles-module__expanded___ofKPx    >
+Ancestor with aria-hidden: <div> @ http://localhost:3003/test-modals:0
+[  185433ms] [ERROR] ../dist/index.mjs
+Error: Failed to read source code from /Users/stevesmith/Projects/benji-agentation/agentation/package/dist/index.mjs
+
+Caused by:
+    No such file or directory (os error 2)
+
+Import trace for requested module:
+../dist/index.mjs
+./src/app/ToolbarProvider.tsx @ webpack-internal:///(app-pages-browser)/../../node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1_sass@1.97.3/node_modules/next/dist/client/app-index.js:32
+[  185714ms] [ERROR] ../dist/index.mjs
+Error: Failed to read source code from /Users/stevesmith/Projects/benji-agentation/agentation/package/dist/index.mjs
+
+Caused by:
+    No such file or directory (os error 2)
+
+Import trace for requested module:
+../dist/index.mjs
+./src/app/ToolbarProvider.tsx @ webpack-internal:///(app-pages-browser)/../../node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1__react@18.3.1_sass@1.97.3/node_modules/next/dist/client/app-index.js:32

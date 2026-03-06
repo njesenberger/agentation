@@ -107,8 +107,17 @@
       "Bash(do echo \"=== Session: $id ===\" curl -s \"http://localhost:4747/sessions/$id\")",
       "Bash(git rev-parse:*)",
       "Bash(git log:*)",
-      "mcp__agentation__agentation_get_all_pending"
+      "mcp__agentation__agentation_get_all_pending",
+      "Bash(pnpm --filter feedback-tool-example build 2>&1 | tail -20)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "Bash(wc:*)",
+      "mcp__agentation__agentation_acknowledge",
+      "Bash(git cherry-pick:*)"
     ]
   },
-  "enableAllProjectMcpServers": false
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "agentation"
+  ]
 }

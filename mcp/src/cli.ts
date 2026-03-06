@@ -85,6 +85,114 @@ async function runInit() {
     }
     console.log();
 
+    // Step 3: Set up hooks for live agent activity
+    console.log(`Live agent activity shows what Claude is doing in real-time`);
+    console.log(`on your web page — editing files, running commands, etc.`);
+    console.log();
+
+    const setupHooks = await question(`Set up live agent activity hooks? [Y/n] `);
+    if (setupHooks.toLowerCase() !== "n") {
+      const statusUrl = `http://localhost:${port}/agent-status`;
+      const pendingUrl = `http://localhost:${port}/pending`;
+      const hooksConfig = {
+        SessionStart: [{
+          hooks: [{
+            type: "command",
+            command: `curl -sf -X POST ${statusUrl} -H 'Content-Type: application/json' -d '{"hook_event_name":"SessionStart"}' --connect-timeout 2 --max-time 3 >/dev/null 2>&1; exit 0`,
+          }],
+        }],
+        UserPromptSubmit: [{
+          hooks: [{
+            type: "command",
+            command: `curl -sf --connect-timeout 1 ${pendingUrl} 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);c=d['count'];exit(0)if c==0 else[print(f'\\n=== AGENTATION: {c} UI annotations ===\\n'),*[print(f\\"[{i+1}] {a[\\'element\\']}\\n    {a[\\'comment\\']}\\n\\")for i,a in enumerate(d['annotations'])],print('=== END ===\\n')]" 2>/dev/null;exit 0`,
+          }],
+        }],
+        PreToolUse: [{
+          matcher: "Edit|Write|Bash|Read|Glob|Grep|Agent",
+          hooks: [{
+            type: "http",
+            url: statusUrl,
+            timeout: 5,
+          }],
+        }],
+        PostToolUse: [{
+          matcher: "Edit|Write|Bash",
+          hooks: [{
+            type: "http",
+            url: statusUrl,
+            timeout: 5,
+          }],
+        }],
+        PostToolUseFailure: [{
+          matcher: "Edit|Write|Bash",
+          hooks: [{
+            type: "http",
+            url: statusUrl,
+            timeout: 5,
+          }],
+        }],
+        Stop: [{
+          hooks: [
+            {
+              type: "http",
+              url: statusUrl,
+              timeout: 5,
+            },
+            {
+              type: "command",
+              command: `response=$(curl -sf --connect-timeout 1 --max-time 2 ${pendingUrl} 2>/dev/null) && count=$(echo "$response" | python3 -c "import sys,json;print(json.load(sys.stdin)['count'])" 2>/dev/null) && [ "$count" -gt 0 ] 2>/dev/null && echo "$response" | python3 -c "import sys,json;d=json.load(sys.stdin);annotations='\\n'.join(f\\"[{i+1}] {a['element']}: {a['comment']}\\" for i,a in enumerate(d['annotations']));print(json.dumps({'decision':'block','reason':f'There are {d[\\"count\\"]} new UI annotations to address:\\n{annotations}\\nPlease review and action these annotations.'}))" 2>/dev/null || exit 0`,
+            },
+          ],
+        }],
+        Notification: [{
+          matcher: "permission_prompt|idle_prompt",
+          hooks: [{
+            type: "http",
+            url: statusUrl,
+            timeout: 5,
+          }],
+        }],
+      };
+
+      try {
+        // Ensure .claude directory exists
+        const claudeDir = path.join(process.cwd(), ".claude");
+        if (!fs.existsSync(claudeDir)) {
+          fs.mkdirSync(claudeDir, { recursive: true });
+        }
+
+        const settingsPath = path.join(claudeDir, "settings.json");
+        let settings: Record<string, unknown> = {};
+
+        if (fs.existsSync(settingsPath)) {
+          try {
+            settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+          } catch {
+            // If file is malformed, start fresh
+          }
+        }
+
+        // Merge hooks (don't overwrite existing hooks for other events)
+        const existingHooks = (settings.hooks || {}) as Record<string, unknown[]>;
+        settings.hooks = { ...existingHooks, ...hooksConfig };
+
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+
+        console.log(`✓ Added hooks to .claude/settings.json`);
+        console.log(`  - SessionStart → "session connected" on toolbar`);
+        console.log(`  - PreToolUse → live "editing file..." status`);
+        console.log(`  - PostToolUse → "file saved" confirmation`);
+        console.log(`  - PostToolUseFailure → "build failed" error state`);
+        console.log(`  - Stop → finished + auto-loop if new annotations`);
+        console.log(`  - Notification → permission/idle prompts`);
+        console.log(`  - UserPromptSubmit → annotation context injection`);
+      } catch (err) {
+        console.log(`✗ Could not write hooks: ${err}`);
+        console.log(`  You can add them manually. See: npx agentation-mcp help`);
+      }
+    }
+    console.log();
+
     // Test connection
     const testNow = await question(`Start server and test connection? [Y/n] `);
     if (testNow.toLowerCase() !== "n") {
@@ -191,7 +299,26 @@ async function runDoctor() {
     results.push({ name: "Stale config", status: "warn", message: `${oldConfigPath} exists but Claude Code doesn't read this file. Safe to delete.` });
   }
 
-  // Check 4: Server connectivity (try default port)
+  // Check 4: Hooks configuration
+  const projectSettingsPath = path.join(process.cwd(), ".claude", "settings.json");
+  if (fs.existsSync(projectSettingsPath)) {
+    try {
+      const settings = JSON.parse(fs.readFileSync(projectSettingsPath, "utf-8"));
+      const hooks = settings.hooks as Record<string, unknown[]> | undefined;
+      const hasPostToolUse = hooks?.PostToolUse && JSON.stringify(hooks.PostToolUse).includes("agent-status");
+      if (hasPostToolUse) {
+        results.push({ name: "Hooks", status: "pass", message: "Agent activity hooks configured" });
+      } else {
+        results.push({ name: "Hooks", status: "warn", message: "No agent activity hooks. Run: agentation-mcp init" });
+      }
+    } catch {
+      results.push({ name: "Hooks", status: "warn", message: "Could not parse .claude/settings.json" });
+    }
+  } else {
+    results.push({ name: "Hooks", status: "warn", message: "No .claude/settings.json found. Run: agentation-mcp init" });
+  }
+
+  // Check 5: Server connectivity (try default port)
   try {
     const response = await fetch("http://localhost:4747/health", { signal: AbortSignal.timeout(2000) });
     if (response.ok) {

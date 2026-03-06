@@ -14,6 +14,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { ActionRequest } from "../types.js";
+import { getHttpServerStatus } from "./http.js";
 
 // -----------------------------------------------------------------------------
 // Configuration
@@ -525,6 +526,13 @@ function watchForAnnotations(
 export async function handleTool(name: string, args: unknown): Promise<ToolResult> {
   switch (name) {
     case "agentation_list_sessions": {
+      const httpStatus = getHttpServerStatus();
+      if (!httpStatus.up) {
+        const reason = httpStatus.error
+          ? `HTTP server failed to start: ${httpStatus.error}`
+          : `HTTP server is not running. The browser toolbar cannot connect without it.`;
+        return error(`⚠️ ${reason}\n\nThe MCP stdio connection works, but the browser toolbar needs the HTTP server to send annotations. Try restarting the agentation server or check if port 4747 is in use.`);
+      }
       const sessions = await httpGet<Session[]>("/sessions");
       return success({
         sessions: sessions.map((s) => ({

@@ -20,7 +20,9 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconLayout,
+  IconHelp,
 } from "../icons";
+import { Tooltip } from "../tooltip";
 import { HelpTooltip } from "../help-tooltip";
 import { DesignMode } from "../design-mode";
 import { DesignPalette } from "../design-mode/palette";
@@ -341,6 +343,8 @@ export function PageFeedbackToolbarCSS({
 }: PageFeedbackToolbarCSSProps = {}) {
   const [isActive, setIsActive] = useState(false);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const annotationsRef = useRef<Annotation[]>([]);
+  annotationsRef.current = annotations;
   const [showMarkers, setShowMarkers] = useState(true);
   const [isToolbarHidden, setIsToolbarHidden] = useState(() => loadToolbarHidden());
   const [isToolbarHiding, setIsToolbarHiding] = useState(false);
@@ -591,6 +595,33 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     "disconnected" | "connecting" | "connected"
   >(endpoint ? "connecting" : "disconnected");
 
+  // Agent activity state (from Claude Code hooks via SSE)
+  const [agentActivity, setAgentActivity] = useState<{
+    active: boolean;
+    summary: string;
+    tool_name?: string;
+    event?: string;
+  } | null>(null);
+  const [showActivityLabel, setShowActivityLabel] = useState(false);
+  const [activityLabelExiting, setActivityLabelExiting] = useState(false);
+  const [activityLabelSwapping, setActivityLabelSwapping] = useState(false);
+  const agentActivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activityLabelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevSummaryRef = useRef<string | null>(null);
+
+  // Progress tracking: total annotations created vs resolved this session
+  const [agentProgress, setAgentProgress] = useState<{
+    total: number;
+    resolved: number;
+  } | null>(null);
+
+  // Toolbar pulse on file edit or resolve (visual confirmation that change landed)
+  const [toolbarPulse, setToolbarPulse] = useState<'edit' | 'resolve' | null>(null);
+  const pulseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Progress counter animation
+  const [progressBump, setProgressBump] = useState(0);
+
   // Draggable toolbar state
   const [toolbarPosition, setToolbarPosition] = useState<{
     x: number;
@@ -632,6 +663,17 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
   const pathname =
     typeof window !== "undefined" ? window.location.pathname : "/";
+
+  // Trigger toolbar pulse with re-trigger support (clears previous, briefly resets to force CSS animation restart)
+  const triggerPulse = useCallback((type: 'edit' | 'resolve') => {
+    if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current);
+    setToolbarPulse(null);
+    // Microtask delay to ensure class removal before re-adding (forces animation restart)
+    requestAnimationFrame(() => {
+      setToolbarPulse(type);
+      pulseTimeoutRef.current = originalSetTimeout(() => setToolbarPulse(null), 850);
+    });
+  }, []);
 
   // Handle showSettings changes with exit animation
   useEffect(() => {
@@ -993,6 +1035,18 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
           const id = event.payload.id as string;
           const kind = event.payload.kind as string | undefined;
 
+          // Track progress: increment resolved count
+          setAgentProgress((prev) => {
+            if (!prev) return prev;
+            return { ...prev, resolved: prev.resolved + 1 };
+          });
+
+          // Bump progress counter animation
+          setProgressBump((c) => c + 1);
+
+          // Pulse the toolbar green (resolve confirmation)
+          triggerPulse('resolve');
+
           if (kind === "placement") {
             // Reverse-lookup: find which placementId maps to this annotation ID
             for (const [placementId, annotationId] of placementAnnotationMap.current) {
@@ -1017,7 +1071,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               }
             }
           } else {
-            // Feedback annotation — trigger exit animation then remove
+            // Feedback annotation — trigger exit animation then remove (400ms to match markerResolveOut)
             setExitingMarkers((prev) => new Set(prev).add(id));
             originalSetTimeout(() => {
               setAnnotations((prev) => prev.filter((a) => a.id !== id));
@@ -1026,7 +1080,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                 next.delete(id);
                 return next;
               });
-            }, 150);
+            }, 400);
           }
         }
       } catch {
@@ -1036,11 +1090,114 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
     eventSource.addEventListener("annotation.updated", handler);
 
+    // Listen for agent activity events (from Claude Code hooks)
+    const agentActivityHandler = (e: MessageEvent) => {
+      try {
+        const event = JSON.parse(e.data);
+        const payload = event.payload;
+        const newSummary = payload.summary || "Working...";
+        const isError = payload.event === "error";
+
+        // Text-swap animation: if summary changed and label is already showing
+        if (prevSummaryRef.current && prevSummaryRef.current !== newSummary) {
+          setActivityLabelSwapping(true);
+          originalSetTimeout(() => setActivityLabelSwapping(false), 150);
+        }
+        prevSummaryRef.current = newSummary;
+
+        setAgentActivity({
+          active: true,
+          summary: newSummary,
+          tool_name: payload.tool_name,
+          event: payload.event,
+        });
+
+        // Show label and keep it visible while agent is active (no auto-hide)
+        setActivityLabelExiting(false);
+        setShowActivityLabel(true);
+
+        // Clear any pending hide timeout — label stays while active
+        if (activityLabelTimeoutRef.current) clearTimeout(activityLabelTimeoutRef.current);
+
+        // Errors persist until next activity replaces them (no timeout)
+        // Normal activity: reset staleness timeout (45s)
+        if (!isError) {
+          if (agentActivityTimeoutRef.current) clearTimeout(agentActivityTimeoutRef.current);
+          agentActivityTimeoutRef.current = originalSetTimeout(() => {
+            setAgentActivity(null);
+            setShowActivityLabel(false);
+            prevSummaryRef.current = null;
+          }, 45000);
+        }
+
+        // Initialize progress tracking when agent starts working
+        setAgentProgress((prev) => {
+          if (!prev && annotationsRef.current.length > 0) {
+            return { total: annotationsRef.current.length, resolved: 0 };
+          }
+          return prev;
+        });
+
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    const agentStoppedHandler = (e: MessageEvent) => {
+      try {
+        JSON.parse(e.data); // validate
+        prevSummaryRef.current = null;
+
+        // Reset progress on stop
+        setAgentProgress(null);
+
+        // Show "Finished" with longer display (8s), then fade
+        setAgentActivity({ active: false, summary: "Finished" });
+        setShowActivityLabel(true);
+
+        if (activityLabelTimeoutRef.current) clearTimeout(activityLabelTimeoutRef.current);
+        activityLabelTimeoutRef.current = originalSetTimeout(() => {
+          setActivityLabelExiting(true);
+          originalSetTimeout(() => {
+            setAgentActivity(null);
+            setShowActivityLabel(false);
+            setActivityLabelExiting(false);
+          }, 150);
+        }, 8000);
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    eventSource.addEventListener("agent.activity", agentActivityHandler);
+    eventSource.addEventListener("agent.stopped", agentStoppedHandler);
+
+    // Fetch current agent status on connect
+    fetch(`${endpoint}/agent-status`)
+      .then((res) => res.json())
+      .then((data: { active?: boolean; summary?: string; tool_name?: string }) => {
+        if (data.active) {
+          setAgentActivity({
+            active: true,
+            summary: data.summary || "Working...",
+            tool_name: data.tool_name,
+          });
+        }
+      })
+      .catch(() => {
+        // Ignore - agent status is optional
+      });
+
     return () => {
       eventSource.removeEventListener("annotation.updated", handler);
+      eventSource.removeEventListener("agent.activity", agentActivityHandler);
+      eventSource.removeEventListener("agent.stopped", agentStoppedHandler);
       eventSource.close();
+      if (agentActivityTimeoutRef.current) clearTimeout(agentActivityTimeoutRef.current);
+      if (activityLabelTimeoutRef.current) clearTimeout(activityLabelTimeoutRef.current);
     };
   }, [endpoint, mounted, currentSessionId]);
+
 
   // Sync local annotations when connection is restored
   useEffect(() => {
@@ -3582,7 +3739,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       >
         {/* Morphing container */}
         <div
-          className={`${styles.toolbarContainer} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
+          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${isDraggingToolbar ? styles.dragging : ""} ${toolbarPulse === 'edit' ? styles.editPulse : ""} ${toolbarPulse === 'resolve' ? styles.resolvePulse : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
           onClick={
             !isActive
               ? (e) => {
@@ -3611,6 +3768,22 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                 className={`${styles.badge} ${isActive ? styles.fadeOut : ""} ${showEntranceAnimation ? styles.entrance : ""}`}
               >
                 {visibleAnnotations.length}
+              </span>
+            )}
+            {/* Agent activity label - shown on collapsed FAB */}
+            {!isActive && showActivityLabel && agentActivity?.summary && (
+              <span
+                className={`${styles.agentActivityLabel} ${styles.onFab} ${!isDarkMode ? styles.light : ""} ${activityLabelExiting ? styles.exiting : ""} ${activityLabelSwapping ? styles.swapping : ""} ${agentActivity.event === "error" ? styles.error : ""}`}
+              >
+                <span className={styles.agentActivityLabelText}>
+                  {agentActivity.event === "tool_use" && <span className={styles.activityDot} />}
+                  {agentActivity.summary}
+                  {agentProgress && agentProgress.total > 0 && (
+                    <span key={progressBump} className={`${styles.progressCount} ${progressBump > 0 ? styles.progressBump : ""}`}>
+                      {" "}{agentProgress.resolved}/{agentProgress.total}
+                    </span>
+                  )}
+                </span>
               </span>
             )}
           </div>
@@ -3808,13 +3981,30 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               </button>
               {endpoint && connectionStatus !== "disconnected" && (
                 <span
-                  className={`${styles.mcpIndicator} ${styles[connectionStatus]} ${showSettings ? styles.hidden : ""}`}
+                  className={`${styles.mcpIndicator} ${!isDarkMode ? styles.light : ""} ${styles[connectionStatus]} ${agentActivity?.active ? (agentActivity.event === "error" ? styles.agentError : styles.agentActive) : ""} ${showSettings ? styles.hidden : ""}`}
                   title={
-                    connectionStatus === "connected"
-                      ? "MCP Connected"
-                      : "MCP Connecting..."
+                    agentActivity?.active
+                      ? agentActivity.summary
+                      : connectionStatus === "connected"
+                        ? "MCP Connected"
+                        : "MCP Connecting..."
                   }
                 />
+              )}
+              {isActive && showActivityLabel && agentActivity?.summary && (
+                <span
+                  className={`${styles.agentActivityLabel} ${styles.onToolbar} ${!isDarkMode ? styles.light : ""} ${activityLabelExiting ? styles.exiting : ""} ${activityLabelSwapping ? styles.swapping : ""} ${agentActivity.event === "error" ? styles.error : ""}`}
+                >
+                  <span className={styles.agentActivityLabelText}>
+                    {agentActivity.event === "tool_use" && <span className={styles.activityDot} />}
+                    {agentActivity.summary}
+                    {agentProgress && agentProgress.total > 0 && (
+                      <span className={styles.progressCount}>
+                        {" "}{agentProgress.resolved}/{agentProgress.total}
+                      </span>
+                    )}
+                  </span>
+                </span>
               )}
               <span className={styles.buttonTooltip}>Settings</span>
             </div>
@@ -3982,6 +4172,70 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                 window.addEventListener("mouseup", onUp);
               }}
             />
+
+                {/* MCP Connection section */}
+                <div className={styles.settingsSection}>
+                  <div className={styles.settingsRow}>
+                    <span
+                      className={`${styles.automationHeader} ${!isDarkMode ? styles.light : ""}`}
+                    >
+                      MCP Connection
+                      <Tooltip content="Connect via Model Context Protocol to let AI agents like Claude Code receive annotations in real-time.">
+                        <span
+                          className={`${styles.helpIcon} ${styles.helpIconNudgeDown}`}
+                        >
+                          <IconHelp size={20} />
+                        </span>
+                      </Tooltip>
+                    </span>
+                    {endpoint && (
+                      <div
+                        className={`${styles.mcpStatusDot} ${styles[connectionStatus]}`}
+                        title={
+                          connectionStatus === "connected"
+                            ? "Connected"
+                            : connectionStatus === "connecting"
+                              ? "Connecting..."
+                              : "Disconnected"
+                        }
+                      />
+                    )}
+                  </div>
+                  <p
+                    className={`${styles.automationDescription} ${!isDarkMode ? styles.light : ""}`}
+                    style={{ paddingBottom: 6 }}
+                  >
+                    MCP connection allows agents to receive and act on
+                    annotations.{" "}
+                    <a
+                      href="https://agentation.dev/mcp"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`${styles.learnMoreLink} ${!isDarkMode ? styles.light : ""}`}
+                    >
+                      Learn more
+                    </a>
+                  </p>
+                  {endpoint && connectionStatus === "connected" && (
+                    <p
+                      className={`${styles.automationDescription} ${!isDarkMode ? styles.light : ""}`}
+                      style={{ paddingBottom: 6, display: "flex", alignItems: "center", gap: 6 }}
+                    >
+                      <span
+                        className={`${styles.mcpStatusDot} ${agentActivity?.active ? (agentActivity.event === "error" ? styles.agentErrorInline : styles.agentActiveInline) : styles.connected}`}
+                        style={{ width: 6, height: 6, flexShrink: 0, animation: "none" }}
+                      />
+                      {agentActivity?.active
+                        ? `Agent: ${agentActivity.summary}`
+                        : "Agent: idle"}
+                      {agentProgress && agentProgress.total > 0 && (
+                        <span style={{ opacity: 0.5, marginLeft: 4, fontSize: "11px" }}>
+                          ({agentProgress.resolved}/{agentProgress.total} resolved)
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
 
           <SettingsPanel
             settings={settings}

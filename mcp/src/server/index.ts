@@ -20,7 +20,7 @@ import { startHttpServer } from "./http.js";
 import { startMcpServer, setApiKey } from "./mcp.js";
 
 // Re-export for programmatic use
-export { startHttpServer, setCloudApiKey } from "./http.js";
+export { startHttpServer, setCloudApiKey, getHttpServerStatus } from "./http.js";
 export { startMcpServer, setApiKey } from "./mcp.js";
 export * from "./store.js";
 

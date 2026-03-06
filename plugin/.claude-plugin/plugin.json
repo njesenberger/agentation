@@ -1,0 +1,12 @@
+{
+  "name": "agentation",
+  "description": "Auto-installs and wires up the agentation visual feedback toolbar in React projects",
+  "version": "1.0.0",
+  "author": {
+    "name": "Benji Taylor"
+  },
+  "homepage": "https://agentation.dev",
+  "repository": "https://github.com/benjitaylor/agentation",
+  "license": "MIT",
+  "keywords": ["agentation", "feedback", "annotations", "react", "ui"]
+}

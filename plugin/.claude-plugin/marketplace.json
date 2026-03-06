@@ -1,0 +1,17 @@
+{
+  "name": "agentation-plugins",
+  "owner": {
+    "name": "Benji Taylor",
+    "email": "benji@agentation.dev"
+  },
+  "metadata": {
+    "description": "Plugins for agentation - visual feedback for AI coding agents"
+  },
+  "plugins": [
+    {
+      "name": "agentation",
+      "source": "./",
+      "description": "Auto-installs and wires up the agentation visual feedback toolbar in React projects"
+    }
+  ]
+}

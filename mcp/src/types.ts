@@ -108,7 +108,9 @@ export type AFSEventType =
   | "session.updated"
   | "session.closed"
   | "thread.message"
-  | "action.requested";
+  | "action.requested"
+  | "agent.activity"
+  | "agent.stopped";
 
 export type ActionRequest = {
   sessionId: string;
@@ -117,12 +119,21 @@ export type ActionRequest = {
   timestamp: string;
 };
 
+export type AgentStatusPayload = {
+  event: "tool_use" | "stopped" | "notification" | "error";
+  summary: string; // Human-readable: "Editing app.tsx", "Running tests"
+  active: boolean;
+  tool_name?: string;
+  notification_type?: string;
+  timestamp: string;
+};
+
 export type AFSEvent = {
   type: AFSEventType;
   timestamp: string; // ISO 8601
   sessionId: string;
   sequence: number; // Monotonic for ordering/dedup/replay
-  payload: Annotation | Session | ThreadMessage | ActionRequest;
+  payload: Annotation | Session | ThreadMessage | ActionRequest | AgentStatusPayload;
 };
 
 // -----------------------------------------------------------------------------

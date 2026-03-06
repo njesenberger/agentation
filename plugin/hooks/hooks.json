@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/ensure-agentation.sh",
+            "timeout": 60,
+            "statusMessage": "Installing agentation..."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -217,13 +217,16 @@ export default function AgentationDocs() {
 
   return (
     <>
-      <article className="article" style={{ paddingTop: '3.75rem' }}>
-        <header>
-          <div className="heading-container">
-            <h1 style={{ fontSize: "2rem", lineHeight: 1.15, marginBottom: "0.5rem" }}><span className="sketchy-underline">Visual feedback.</span><br />For <span className="pen-underline">agents.</span></h1>
-            <InstallSnippet />
-          </div>
-          <p className="tagline">Agentation turns UI annotations into structured context that AI coding agents can understand and act on. Click any element, add a note, and paste the output into Claude Code, Codex, or any AI tool.</p>
+      <article className="article">
+        <Link href="/blog/introducing-agentation-2" className="announcement-banner">
+          <span className="pulse-dot" />
+          <span><span style={{ fontWeight: 500 }}>New in 2.0:</span> Real-time agent sync</span>
+          <span style={{ color: '#4a9eff', marginLeft: '0.5rem' }}>&rarr;</span>
+        </Link>
+        <header style={{ position: 'relative' }}>
+          <InstallSnippet />
+          <h1 style={{ fontSize: '2rem', lineHeight: 1.15, marginBottom: '0.5rem' }}><span className="sketchy-underline">Point at bugs.</span><br />Let AI <span className="pen-underline">fix them.</span></h1>
+          <p className="tagline">A floating toolbar that turns your design feedback into structured context for AI coding agents. Annotate any element, and let Claude Code, Cursor, or any AI tool act on it.</p>
         </header>
 
         {/* Animated demo */}
@@ -232,8 +235,8 @@ export default function AgentationDocs() {
         <section>
           <h2>How you use it</h2>
           <ol>
-            <li>Click the <svg style={{ display: 'inline-block', verticalAlign: '-0.45em', width: '1.5em', height: '1.5em', margin: '0 -0.1em' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11.5 12L5.5 12" /><path d="M18.5 6.75L5.5 6.75" /><path d="M9.25 17.25L5.5 17.25" /><path d="M16 12.75L16.5179 13.9677C16.8078 14.6494 17.3506 15.1922 18.0323 15.4821L19.25 16L18.0323 16.5179C17.3506 16.8078 16.8078 17.3506 16.5179 18.0323L16 19.25L15.4821 18.0323C15.1922 17.3506 14.6494 16.8078 13.9677 16.5179L12.75 16L13.9677 15.4821C14.6494 15.1922 15.1922 14.6494 15.4821 13.9677L16 12.75Z" /></svg> icon in the bottom-right corner to activate</li>
-            <li><strong>Hover</strong> over elements to see their names highlighted</li>
+
+
             <li><strong>Click</strong> any element to add an annotation</li>
             <li>Write your feedback and click <strong>Add</strong></li>
             <li>Click <svg style={{ display: 'inline-block', verticalAlign: '-0.45em', width: '1.5em', height: '1.5em', margin: '0 -0.1em' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M4.75 11.25C4.75 10.4216 5.42157 9.75 6.25 9.75H12.75C13.5784 9.75 14.25 10.4216 14.25 11.25V17.75C14.25 18.5784 13.5784 19.25 12.75 19.25H6.25C5.42157 19.25 4.75 18.5784 4.75 17.75V11.25Z" /><path d="M17.25 14.25H17.75C18.5784 14.25 19.25 13.5784 19.25 12.75V6.25C19.25 5.42157 18.5784 4.75 17.75 4.75H11.25C10.4216 4.75 9.75 5.42157 9.75 6.25V6.75" /></svg> to copy formatted markdown</li>
@@ -245,7 +248,7 @@ export default function AgentationDocs() {
               margin: '-0.04em -0.06em',
               padding: '0.04em 0.06em',
               borderRadius: '0.2em 0.15em',
-              backgroundImage: 'linear-gradient(75deg, rgba(250, 204, 21, 0.5), rgba(250, 204, 21, 0.15) 4%, rgba(250, 204, 21, 0.3) 96%, rgba(250, 204, 21, 0.6))',
+              backgroundImage: 'linear-gradient(75deg, rgba(239, 68, 68, 0.5), rgba(239, 68, 68, 0.15) 4%, rgba(239, 68, 68, 0.3) 96%, rgba(239, 68, 68, 0.6))',
             }}>Note:</strong> With <Link href="/mcp">MCP</Link>, you can skip the copy-paste step entirely &mdash; your agent already sees what you&apos;re pointing at. Just say &ldquo;address my feedback&rdquo; or &ldquo;fix annotation 3.&rdquo;
           </p>
         </section>
@@ -276,10 +279,10 @@ export default function AgentationDocs() {
 
           <div className="demo-elements">
             <div className="button-group">
-              <button className="demo-button" onClick={() => alert("Primary clicked!")}>Primary</button>
+              <button className="demo-button" onClick={() => alert("Primary clicked!")} style={{ background: '#facc15', color: '#111' }}>Primary</button>
               <button className="demo-button secondary" onClick={() => alert("Secondary clicked!")}>Secondary</button>
-              <button className="demo-button" onClick={openModal} style={{ background: '#3c82f7' }}>Modal</button>
-              <button className="demo-button" onClick={openShadowModal} style={{ background: '#7c3aed' }}>Shadow Modal</button>
+              <button className="demo-button" onClick={openModal} style={{ background: '#ef4444', color: 'white' }}>Modal</button>
+              <button className="demo-button" onClick={openShadowModal} style={{ background: '#22c55e', color: 'white', fontSize: '0.875rem', padding: '0.5625rem 1rem' }}>Sonic Modal</button>
             </div>
 
             <input
@@ -302,7 +305,6 @@ export default function AgentationDocs() {
 
         {/* Animation Demo - hidden on mobile since tool is desktop-only */}
         <section className="demo-section hide-on-mobile">
-          <h2>Animation pause demo</h2>
           <p>
             Click <svg style={{ display: 'inline-block', verticalAlign: '-0.45em', width: '1.5em', height: '1.5em', margin: '0 -0.1em' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8 6L8 18" /><path d="M16 18L16 6" /></svg> in the toolbar to freeze this animation:
           </p>
@@ -332,10 +334,9 @@ export default function AgentationDocs() {
         <section>
           <h2>Best practices</h2>
           <ul>
-            <li><strong>Be specific</strong> &mdash; &ldquo;Button text unclear&rdquo; is better than &ldquo;fix this&rdquo;</li>
-            <li><strong>One issue per annotation</strong> &mdash; easier for the agent to address individually</li>
-            <li><strong>Include context</strong> &mdash; mention what you expected vs. what you see</li>
-            <li><strong>Use text selection</strong> &mdash; for typos or content issues, select the exact text</li>
+            <li>One issue per annotation &mdash; easier for the agent to address individually</li>
+            <li>Include context &mdash; mention what you expected vs. what you see</li>
+            <li style={{ fontSize: '1.125rem' }}><strong>Use text selection</strong> &mdash; for typos or content issues, select the exact text</li>
             <li><strong>Pause animations</strong> &mdash; to annotate a specific animation frame</li>
           </ul>
         </section>

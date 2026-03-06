@@ -1,0 +1,85 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -sf -X POST http://localhost:4747/agent-status -H 'Content-Type: application/json' -d '{\"hook_event_name\":\"SessionStart\"}' --connect-timeout 2 --max-time 3 >/dev/null 2>&1; exit 0"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -sf --connect-timeout 1 http://localhost:4747/pending 2>/dev/null | python3 -c \"import sys,json;d=json.load(sys.stdin);c=d['count'];exit(0)if c==0 else[print(f'\\n=== AGENTATION: {c} UI annotations ===\\n'),*[print(f\\\"[{i+1}] {a['element']}\\n    {a['comment']}\\n\\\")for i,a in enumerate(d['annotations'])],print('=== END ===\\n')]\" 2>/dev/null;exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|Bash|mcp__agentation__.*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:4747/agent-status",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:4747/agent-status",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:4747/agent-status",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "response=$(curl -sf --connect-timeout 1 --max-time 2 http://localhost:4747/pending 2>/dev/null) && count=$(echo \"$response\" | python3 -c \"import sys,json;print(json.load(sys.stdin)['count'])\" 2>/dev/null) && [ \"$count\" -gt 0 ] 2>/dev/null && echo \"$response\" | python3 -c \"import sys,json;d=json.load(sys.stdin);annotations='\\n'.join(f\\\"[{i+1}] {a['element']}: {a['comment']}\\\" for i,a in enumerate(d['annotations']));print(json.dumps({'decision':'block','reason':f'There are {d[\\\"count\\\"]} new UI annotations to address:\\n{annotations}\\nPlease review and action these annotations.'}))\" 2>/dev/null || exit 0"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:4747/agent-status",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:4747/agent-status",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

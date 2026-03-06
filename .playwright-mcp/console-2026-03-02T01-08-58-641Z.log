@@ -1,0 +1,40 @@
+[  538542ms] [ERROR] ./src/app/components/DeepSelectDemo.tsx
+Error: 
+  × Unexpected token `div`. Expected jsx identifier
+     ╭─[/Users/stevesmith/Projects/benji-agentation/agentation/package/example/src/app/components/DeepSelectDemo.tsx:231:1]
+ 231 │   const chartHeights = [45, 60, 35, 75, 55, 90, 70, 85];
+ 232 │ 
+ 233 │   return (
+ 234 │     <div className="fd-container">
+     ·      ───
+ 235 │       <div className="demo-window">
+ 236 │         <div className="demo-browser-bar">
+ 237 │           <div className="demo-dot" />
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/components/DeepSelectDemo.tsx
+./src/app/features/page.tsx @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@14.2.35_@babel+core@7.28.6_react-dom@18.3.1_react@18.3.1__react@18.3.1_sass@1.97.2/node_modules/next/dist/client/app-index.js:32
+[  545176ms] [ERROR] ./src/app/components/DeepSelectDemo.tsx
+Error: 
+  × Unexpected token `div`. Expected jsx identifier
+     ╭─[/Users/stevesmith/Projects/benji-agentation/agentation/package/example/src/app/components/DeepSelectDemo.tsx:231:1]
+ 231 │   const chartHeights = [45, 60, 35, 75, 55, 90, 70, 85];
+ 232 │ 
+ 233 │   return (
+ 234 │     <div className="fd-container">
+     ·      ───
+ 235 │       <div className="demo-window">
+ 236 │         <div className="demo-browser-bar">
+ 237 │           <div className="demo-dot" />
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/components/DeepSelectDemo.tsx
+./src/app/features/page.tsx @ webpack-internal:///(app-pages-browser)/../node_modules/.pnpm/next@14.2.35_@babel+core@7.28.6_react-dom@18.3.1_react@18.3.1__react@18.3.1_sass@1.97.2/node_modules/next/dist/client/app-index.js:32
