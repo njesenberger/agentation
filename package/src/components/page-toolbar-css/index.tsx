@@ -86,6 +86,8 @@ import {
 
 import type { Annotation } from "../../types";
 import styles from "./styles.module.scss";
+import { Tooltip } from "../tooltip";
+import { HelpTooltip } from "../help-tooltip";
 
 /**
  * Composes element identification with React component detection.
@@ -145,18 +147,18 @@ type MarkerClickBehavior = "edit" | "delete";
 type ToolbarSettings = {
   outputDetail: OutputDetailLevel;
   autoClearAfterCopy: boolean;
-  annotationColor: string;
+  annotationColorId: string;
   blockInteractions: boolean;
-  reactEnabled: boolean; // Simple toggle - mode derived from outputDetail
+  reactEnabled: boolean;
   markerClickBehavior: MarkerClickBehavior;
-  webhookUrl: string; // Overrides prop if set
+  webhookUrl: string;
   webhooksEnabled: boolean;
 };
 
 const DEFAULT_SETTINGS: ToolbarSettings = {
   outputDetail: "standard",
   autoClearAfterCopy: false,
-  annotationColor: "#3c82f7",
+  annotationColorId: "blue",
   blockInteractions: true,
   reactEnabled: true,
   markerClickBehavior: "edit",
@@ -199,14 +201,32 @@ const OUTPUT_DETAIL_OPTIONS: { value: OutputDetailLevel; label: string }[] = [
 ];
 
 const COLOR_OPTIONS = [
-  { value: "#AF52DE", label: "Purple" },
-  { value: "#3c82f7", label: "Blue" },
-  { value: "#5AC8FA", label: "Cyan" },
-  { value: "#34C759", label: "Green" },
-  { value: "#FFD60A", label: "Yellow" },
-  { value: "#FF9500", label: "Orange" },
-  { value: "#FF3B30", label: "Red" },
+  { id: "indigo",  label: "Indigo",  srgb: "#6155F5", p3: "color(display-p3 0.38 0.33 0.96)" },
+  { id: "blue",    label: "Blue",    srgb: "#0088FF", p3: "color(display-p3 0.00 0.53 1.00)" },
+  { id: "cyan",    label: "Cyan",    srgb: "#00C3D0", p3: "color(display-p3 0.00 0.76 0.82)" },
+  { id: "green",   label: "Green",   srgb: "#34C759", p3: "color(display-p3 0.20 0.78 0.35)" },
+  { id: "yellow",  label: "Yellow",  srgb: "#FFCC00", p3: "color(display-p3 1.00 0.80 0.00)" },
+  { id: "orange",  label: "Orange",  srgb: "#FF8D28", p3: "color(display-p3 1.00 0.55 0.16)" },
+  { id: "red",     label: "Red",     srgb: "#FF383C", p3: "color(display-p3 1.00 0.22 0.24)" },
 ];
+
+const injectAgentationColorTokens = () => {
+  if (typeof document === "undefined") return;
+  const style = document.createElement("style");
+  style.textContent = [
+    `:root {
+      ${COLOR_OPTIONS.map(c => `--agentation-color-${c.id}: ${c.srgb};`).join("\n")}
+    }`,
+    `@supports (color: color(display-p3 0 0 0)) {
+      :root {
+        ${COLOR_OPTIONS.map(c => `--agentation-color-${c.id}: ${c.p3};`).join("\n")}
+      }
+    }`,
+  ].join("");
+  document.head.appendChild(style);
+}
+
+injectAgentationColorTokens();
 
 // =============================================================================
 // Utils
@@ -581,7 +601,6 @@ export function PageFeedbackToolbarCSS({
   const [settingsPage, setSettingsPage] = useState<"main" | "automations">(
     "main",
   );
-  const [isTransitioning, setIsTransitioning] = useState(false);
   const [tooltipsHidden, setTooltipsHidden] = useState(false);
   const [tooltipSessionActive, setTooltipSessionActive] = useState(false);
   const tooltipSessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -634,110 +653,30 @@ export function PageFeedbackToolbarCSS({
     };
   }, []);
 
-  // Tooltip component that renders via portal to escape overflow clipping
-  const Tooltip = ({
-    content,
-    children,
-  }: {
-    content: string;
-    children: React.ReactNode;
-  }) => {
-    const [isHovering, setIsHovering] = useState(false);
-    const [visible, setVisible] = useState(false);
-    const [shouldRender, setShouldRender] = useState(false);
-    const [position, setPosition] = useState({ top: 0, right: 0 });
-    const triggerRef = useRef<HTMLSpanElement>(null);
-    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    const updatePosition = () => {
-      if (triggerRef.current) {
-        const rect = triggerRef.current.getBoundingClientRect();
-        setPosition({
-          top: rect.top + rect.height / 2,
-          right: window.innerWidth - rect.left + 8,
-        });
-      }
+const [settings, setSettings] = useState<ToolbarSettings>(() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem("feedback-toolbar-settings") ?? "");
+    return {
+      ...DEFAULT_SETTINGS,
+      ...saved,
+      annotationColorId: COLOR_OPTIONS.find(c => c.id === saved.annotationColorId)
+        ? saved.annotationColorId
+        : DEFAULT_SETTINGS.annotationColorId,
     };
-
-    const handleMouseEnter = () => {
-      setIsHovering(true);
-      setShouldRender(true);
-      if (exitTimeoutRef.current) {
-        clearTimeout(exitTimeoutRef.current);
-        exitTimeoutRef.current = null;
-      }
-      updatePosition();
-      timeoutRef.current = originalSetTimeout(() => {
-        setVisible(true);
-      }, 500); // 0.5s delay before showing
-    };
-
-    const handleMouseLeave = () => {
-      setIsHovering(false);
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      setVisible(false);
-      // Keep rendered during exit animation
-      exitTimeoutRef.current = originalSetTimeout(() => {
-        setShouldRender(false);
-      }, 150);
-    };
-
-    useEffect(() => {
-      return () => {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        if (exitTimeoutRef.current) clearTimeout(exitTimeoutRef.current);
-      };
-    }, []);
-
-    return (
-      <>
-        <span
-          ref={triggerRef}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
-          {children}
-        </span>
-        {shouldRender &&
-          createPortal(
-            <div
-              data-feedback-toolbar
-              style={{
-                position: "fixed",
-                top: position.top,
-                right: position.right,
-                transform: "translateY(-50%)",
-                padding: "6px 10px",
-                background: "#383838",
-                color: "rgba(255, 255, 255, 0.7)",
-                fontSize: "11px",
-                fontWeight: 400,
-                lineHeight: "14px",
-                borderRadius: "10px",
-                width: "180px",
-                textAlign: "left" as const,
-                zIndex: 100020,
-                pointerEvents: "none" as const,
-                boxShadow: "0px 1px 8px rgba(0, 0, 0, 0.28)",
-                opacity: visible && !isTransitioning ? 1 : 0,
-                transition: "opacity 0.15s ease",
-              }}
-            >
-              {content}
-            </div>,
-            document.body,
-          )}
-      </>
-    );
-  };
-
-  const [settings, setSettings] = useState<ToolbarSettings>(DEFAULT_SETTINGS);
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+});
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [showEntranceAnimation, setShowEntranceAnimation] = useState(false);
+
+  const toggleTheme = () => {
+    portalWrapperRef.current?.classList.add(styles.disableTransitions);
+    setIsDarkMode((previous) => !previous);
+    requestAnimationFrame(() => {
+      portalWrapperRef.current?.classList.remove(styles.disableTransitions);
+    });
+  }
 
   // Check if running in development mode - React detection only works in development mode
   const isDevMode = process.env.NODE_ENV === "development";
@@ -814,12 +753,6 @@ export function PageFeedbackToolbarCSS({
     }
   }, [showSettings]);
 
-  useEffect(() => {
-    setIsTransitioning(true);
-    const timer = originalSetTimeout(() => setIsTransitioning(false), 350);
-    return () => clearTimeout(timer);
-  }, [settingsPage]);
-
   // Unified marker visibility - depends on BOTH toolbar active AND showMarkers toggle
   // This single effect handles all marker show/hide animations
   const shouldShowMarkers = isActive && showMarkers;
@@ -863,15 +796,6 @@ export function PageFeedbackToolbarCSS({
       hasPlayedEntranceAnimation = true;
       // Remove animation class after it completes (toolbar: 500ms, badge: 400ms delay + 300ms)
       originalSetTimeout(() => setShowEntranceAnimation(false), 750);
-    }
-
-    try {
-      const storedSettings = localStorage.getItem("feedback-toolbar-settings");
-      if (storedSettings) {
-        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) });
-      }
-    } catch (e) {
-      // Ignore parsing errors
     }
 
     // Load saved theme preference, default to dark mode
@@ -1563,7 +1487,7 @@ export function PageFeedbackToolbarCSS({
         cursor: text !important;
       }
       [data-feedback-toolbar], [data-feedback-toolbar] * {
-        cursor: default !important;
+        cursor: auto !important;
       }
       [data-feedback-toolbar] textarea,
       [data-feedback-toolbar] input[type="text"],
@@ -3061,7 +2985,7 @@ export function PageFeedbackToolbarCSS({
   };
 
   return createPortal(
-    <div ref={portalWrapperRef} style={{ display: "contents" }}>
+    <div ref={portalWrapperRef} style={{ display: "contents", "--agentation-accent": settings.annotationColorId } as React.CSSProperties} data-agentation-theme={isDarkMode ? "dark" : "light"}>
       {/* Toolbar */}
       <div
         className={`${styles.toolbar}${userClassName ? ` ${userClassName}` : ""}`}
@@ -3079,7 +3003,7 @@ export function PageFeedbackToolbarCSS({
       >
         {/* Morphing container */}
         <div
-          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${isDraggingToolbar ? styles.dragging : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
+          className={`${styles.toolbarContainer} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${isDraggingToolbar ? styles.dragging : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
           onClick={
             !isActive
               ? (e) => {
@@ -3112,7 +3036,6 @@ export function PageFeedbackToolbarCSS({
             {hasAnnotations && (
               <span
                 className={`${styles.badge} ${isActive ? styles.fadeOut : ""} ${showEntranceAnimation ? styles.entrance : ""}`}
-                style={{ backgroundColor: settings.annotationColor }}
               >
                 {annotations.length}
               </span>
@@ -3137,7 +3060,7 @@ export function PageFeedbackToolbarCSS({
               }`}
             >
               <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
+                className={styles.controlButton}
                 onClick={(e) => {
                   e.stopPropagation();
                   hideTooltipsUntilMouseLeave();
@@ -3155,7 +3078,7 @@ export function PageFeedbackToolbarCSS({
 
             <div className={styles.buttonWrapper}>
               <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
+                className={styles.controlButton}
                 onClick={(e) => {
                   e.stopPropagation();
                   hideTooltipsUntilMouseLeave();
@@ -3173,7 +3096,7 @@ export function PageFeedbackToolbarCSS({
 
             <div className={styles.buttonWrapper}>
               <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""} ${copied ? styles.statusShowing : ""}`}
+                className={`${styles.controlButton} ${copied ? styles.statusShowing : ""}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   hideTooltipsUntilMouseLeave();
@@ -3195,7 +3118,7 @@ export function PageFeedbackToolbarCSS({
               className={`${styles.buttonWrapper} ${styles.sendButtonWrapper} ${isActive && !settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.sendButtonVisible : ""}`}
             >
               <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""} ${sendState === "sent" || sendState === "failed" ? styles.statusShowing : ""}`}
+                className={`${styles.controlButton} ${sendState === "sent" || sendState === "failed" ? styles.statusShowing : ""}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   hideTooltipsUntilMouseLeave();
@@ -3218,8 +3141,7 @@ export function PageFeedbackToolbarCSS({
                 <IconSendArrow size={24} state={sendState} />
                 {hasAnnotations && sendState === "idle" && (
                   <span
-                    className={`${styles.buttonBadge} ${!isDarkMode ? styles.light : ""}`}
-                    style={{ backgroundColor: settings.annotationColor }}
+                    className={styles.buttonBadge}
                   >
                     {annotations.length}
                   </span>
@@ -3233,7 +3155,7 @@ export function PageFeedbackToolbarCSS({
 
             <div className={styles.buttonWrapper}>
               <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
+                className={styles.controlButton}
                 onClick={(e) => {
                   e.stopPropagation();
                   hideTooltipsUntilMouseLeave();
@@ -3252,7 +3174,7 @@ export function PageFeedbackToolbarCSS({
 
             <div className={styles.buttonWrapper}>
               <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
+                className={styles.controlButton}
                 onClick={(e) => {
                   e.stopPropagation();
                   hideTooltipsUntilMouseLeave();
@@ -3263,7 +3185,7 @@ export function PageFeedbackToolbarCSS({
               </button>
               {endpoint && connectionStatus !== "disconnected" && (
                 <span
-                  className={`${styles.mcpIndicator} ${!isDarkMode ? styles.light : ""} ${styles[connectionStatus]} ${showSettings ? styles.hidden : ""}`}
+                  className={`${styles.mcpIndicator} ${styles[connectionStatus]} ${showSettings ? styles.hidden : ""}`}
                   title={
                     connectionStatus === "connected"
                       ? "MCP Connected"
@@ -3275,7 +3197,7 @@ export function PageFeedbackToolbarCSS({
             </div>
 
             <div
-              className={`${styles.divider} ${!isDarkMode ? styles.light : ""}`}
+              className={styles.divider}
             />
 
             <div
@@ -3288,7 +3210,7 @@ export function PageFeedbackToolbarCSS({
               }`}
             >
               <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
+                className={styles.controlButton}
                 onClick={(e) => {
                   e.stopPropagation();
                   hideTooltipsUntilMouseLeave();
@@ -3306,7 +3228,7 @@ export function PageFeedbackToolbarCSS({
 
           {/* Settings Panel */}
           <div
-            className={`${styles.settingsPanel} ${isDarkMode ? styles.dark : styles.light} ${showSettingsVisible ? styles.enter : styles.exit}`}
+            className={`${styles.settingsPanel} ${showSettingsVisible ? styles.enter : styles.exit}`}
             onClick={(e) => e.stopPropagation()}
             style={
               toolbarPosition && toolbarPosition.y < 230
@@ -3318,7 +3240,7 @@ export function PageFeedbackToolbarCSS({
             }
           >
             <div
-              className={`${styles.settingsPanelContainer} ${isTransitioning ? styles.transitioning : ""}`}
+              className={styles.settingsPanelContainer}
             >
               <div
                 className={`${styles.settingsPage} ${settingsPage === "automations" ? styles.slideLeft : ""}`}
@@ -3327,10 +3249,6 @@ export function PageFeedbackToolbarCSS({
                   <span className={styles.settingsBrand}>
                     <span
                       className={styles.settingsBrandSlash}
-                      style={{
-                        color: settings.annotationColor,
-                        transition: "color 0.2s ease",
-                      }}
                     >
                       /
                     </span>
@@ -3339,7 +3257,7 @@ export function PageFeedbackToolbarCSS({
                   <span className={styles.settingsVersion}>v{__VERSION__}</span>
                   <button
                     className={styles.themeToggle}
-                    onClick={() => setIsDarkMode(!isDarkMode)}
+                    onClick={toggleTheme}
                     title={
                       isDarkMode
                         ? "Switch to light mode"
@@ -3364,17 +3282,13 @@ export function PageFeedbackToolbarCSS({
                 <div className={styles.settingsSection}>
                   <div className={styles.settingsRow}>
                     <div
-                      className={`${styles.settingsLabel} ${!isDarkMode ? styles.light : ""}`}
+                      className={styles.settingsLabel}
                     >
                       Output Detail
-                      <Tooltip content="Controls how much detail is included in the copied output">
-                        <span className={styles.helpIcon}>
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
+                      <HelpTooltip content="Controls how much detail is included in the copied output" />
                     </div>
                     <button
-                      className={`${styles.cycleButton} ${!isDarkMode ? styles.light : ""}`}
+                      className={styles.cycleButton}
                       onClick={() => {
                         const currentIndex = OUTPUT_DETAIL_OPTIONS.findIndex(
                           (opt) => opt.value === settings.outputDetail,
@@ -3401,7 +3315,7 @@ export function PageFeedbackToolbarCSS({
                         {OUTPUT_DETAIL_OPTIONS.map((option, i) => (
                           <span
                             key={option.value}
-                            className={`${styles.cycleDot} ${!isDarkMode ? styles.light : ""} ${settings.outputDetail === option.value ? styles.active : ""}`}
+                            className={`${styles.cycleDot} ${settings.outputDetail === option.value ? styles.active : ""}`}
                           />
                         ))}
                       </span>
@@ -3412,20 +3326,16 @@ export function PageFeedbackToolbarCSS({
                     className={`${styles.settingsRow} ${styles.settingsRowMarginTop} ${!isDevMode ? styles.settingsRowDisabled : ""}`}
                   >
                     <div
-                      className={`${styles.settingsLabel} ${!isDarkMode ? styles.light : ""}`}
+                      className={styles.settingsLabel}
                     >
                       React Components
-                      <Tooltip
+                      <HelpTooltip
                         content={
                           !isDevMode
                             ? "Disabled — production builds minify component names, making detection unreliable. Use in development mode."
                             : "Include React component names in annotations"
                         }
-                      >
-                        <span className={styles.helpIcon}>
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
+                      />
                     </div>
                     <label
                       className={`${styles.toggleSwitch} ${!isDevMode ? styles.disabled : ""}`}
@@ -3447,14 +3357,10 @@ export function PageFeedbackToolbarCSS({
 
                   <div className={`${styles.settingsRow} ${styles.settingsRowMarginTop}`}>
                     <div
-                      className={`${styles.settingsLabel} ${!isDarkMode ? styles.light : ""}`}
+                      className={styles.settingsLabel}
                     >
                       Hide Until Restart
-                      <Tooltip content="Hides the toolbar until you open a new tab">
-                        <span className={styles.helpIcon}>
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
+                      <HelpTooltip content="Hides the toolbar until you open a new tab" />
                     </div>
                     <label className={styles.toggleSwitch}>
                       <input
@@ -3473,32 +3379,24 @@ export function PageFeedbackToolbarCSS({
 
                 <div className={styles.settingsSection}>
                   <div
-                    className={`${styles.settingsLabel} ${styles.settingsLabelMarker} ${!isDarkMode ? styles.light : ""}`}
+                    className={`${styles.settingsLabel} ${styles.settingsLabelMarker}`}
                   >
-                    Marker Colour
+                    Marker Color
                   </div>
                   <div className={styles.colorOptions}>
-                    {COLOR_OPTIONS.map((color) => (
+                   {COLOR_OPTIONS.map((color) => (
                       <div
-                        key={color.value}
+                        key={color.id}
                         role="button"
-                        onClick={() =>
-                          setSettings((s) => ({
-                            ...s,
-                            annotationColor: color.value,
-                          }))
-                        }
+                        onClick={() => setSettings((s) => ({ ...s, annotationColorId: color.id }))}
                         style={{
-                          borderColor:
-                            settings.annotationColor === color.value
-                              ? color.value
-                              : "transparent",
-                        }}
-                        className={`${styles.colorOptionRing} ${settings.annotationColor === color.value ? styles.selected : ""}`}
+                          "--swatch": color.srgb,
+                          "--swatch-p3": color.p3,
+                        } as React.CSSProperties}
+                        className={`${styles.colorOptionRing} ${settings.annotationColorId === color.id ? styles.selected : ""}`}
                       >
                         <div
-                          className={`${styles.colorOption} ${settings.annotationColor === color.value ? styles.selected : ""}`}
-                          style={{ backgroundColor: color.value }}
+                          className={`${styles.colorOption} ${settings.annotationColorId === color.id ? styles.selected : ""}`}
                           title={color.label}
                         />
                       </div>
@@ -3528,16 +3426,10 @@ export function PageFeedbackToolbarCSS({
                       )}
                     </label>
                     <span
-                      className={`${styles.toggleLabel} ${!isDarkMode ? styles.light : ""}`}
+                      className={styles.toggleLabel}
                     >
                       Clear on copy/send
-                      <Tooltip content="Automatically clear annotations after copying">
-                        <span
-                          className={`${styles.helpIcon} ${styles.helpIconNudge2}`}
-                        >
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
+                      <HelpTooltip content="Automatically clear annotations after copying" />
                     </span>
                   </label>
                   <label
@@ -3563,7 +3455,7 @@ export function PageFeedbackToolbarCSS({
                       )}
                     </label>
                     <span
-                      className={`${styles.toggleLabel} ${!isDarkMode ? styles.light : ""}`}
+                      className={styles.toggleLabel}
                     >
                       Block page interactions
                     </span>
@@ -3574,7 +3466,7 @@ export function PageFeedbackToolbarCSS({
                   className={`${styles.settingsSection} ${styles.settingsSectionExtraPadding}`}
                 >
                   <button
-                    className={`${styles.settingsNavLink} ${!isDarkMode ? styles.light : ""}`}
+                    className={styles.settingsNavLink}
                     onClick={() => setSettingsPage("automations")}
                   >
                     <span>Manage MCP & Webhooks</span>
@@ -3597,7 +3489,7 @@ export function PageFeedbackToolbarCSS({
                 className={`${styles.settingsPage} ${styles.automationsPage} ${settingsPage === "automations" ? styles.slideIn : ""}`}
               >
                 <button
-                  className={`${styles.settingsBackButton} ${!isDarkMode ? styles.light : ""}`}
+                  className={styles.settingsBackButton}
                   onClick={() => setSettingsPage("main")}
                 >
                   <IconChevronLeft size={16} />
@@ -3608,16 +3500,10 @@ export function PageFeedbackToolbarCSS({
                 <div className={styles.settingsSection}>
                   <div className={styles.settingsRow}>
                     <span
-                      className={`${styles.automationHeader} ${!isDarkMode ? styles.light : ""}`}
+                      className={styles.automationHeader}
                     >
                       MCP Connection
-                      <Tooltip content="Connect via Model Context Protocol to let AI agents like Claude Code receive annotations in real-time.">
-                        <span
-                          className={`${styles.helpIcon} ${styles.helpIconNudgeDown}`}
-                        >
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
+                      <HelpTooltip content="Connect via Model Context Protocol to let AI agents like Claude Code receive annotations in real-time." />
                     </span>
                     {endpoint && (
                       <div
@@ -3633,7 +3519,7 @@ export function PageFeedbackToolbarCSS({
                     )}
                   </div>
                   <p
-                    className={`${styles.automationDescription} ${!isDarkMode ? styles.light : ""}`}
+                    className={styles.automationDescription}
                     style={{ paddingBottom: 6 }}
                   >
                     MCP connection allows agents to receive and act on
@@ -3642,7 +3528,7 @@ export function PageFeedbackToolbarCSS({
                       href="https://agentation.dev/mcp"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`${styles.learnMoreLink} ${!isDarkMode ? styles.light : ""}`}
+                      className={styles.learnMoreLink}
                     >
                       Learn more
                     </a>
@@ -3655,20 +3541,14 @@ export function PageFeedbackToolbarCSS({
                 >
                   <div className={styles.settingsRow}>
                     <span
-                      className={`${styles.automationHeader} ${!isDarkMode ? styles.light : ""}`}
+                      className={styles.automationHeader}
                     >
                       Webhooks
-                      <Tooltip content="Send annotation data to any URL endpoint when annotations change. Useful for custom integrations.">
-                        <span
-                          className={`${styles.helpIcon} ${styles.helpIconNoNudge}`}
-                        >
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
+                      <HelpTooltip content="Send annotation data to any URL endpoint when annotations change. Useful for custom integrations." />
                     </span>
                     <div className={styles.autoSendRow}>
                       <span
-                        className={`${styles.autoSendLabel} ${!isDarkMode ? styles.light : ""} ${settings.webhooksEnabled ? styles.active : ""}`}
+                        className={`${styles.autoSendLabel} ${settings.webhooksEnabled ? styles.active : ""}`}
                       >
                         Auto-Send
                       </span>
@@ -3691,20 +3571,15 @@ export function PageFeedbackToolbarCSS({
                     </div>
                   </div>
                   <p
-                    className={`${styles.automationDescription} ${!isDarkMode ? styles.light : ""}`}
+                    className={styles.automationDescription}
                   >
                     The webhook URL will receive live annotation changes and
                     annotation data.
                   </p>
                   <textarea
-                    className={`${styles.webhookUrlInput} ${!isDarkMode ? styles.light : ""}`}
+                    className={styles.webhookUrlInput}
                     placeholder="Webhook URL"
                     value={settings.webhookUrl}
-                    style={
-                      {
-                        "--marker-color": settings.annotationColor,
-                      } as React.CSSProperties
-                    }
                     onKeyDown={(e) => e.stopPropagation()}
                     onChange={(e) =>
                       setSettings((s) => ({
@@ -3733,8 +3608,8 @@ export function PageFeedbackToolbarCSS({
                 (isHovered || isDeleting) && !editingAnnotation;
               const isMulti = annotation.isMultiSelect;
               const markerColor = isMulti
-                ? "#34C759"
-                : settings.annotationColor;
+                ? "#030404"
+                : "var(--agentation-accent)";
               const globalIndex = annotations.findIndex(
                 (a) => a.id === annotation.id,
               );
@@ -3805,7 +3680,7 @@ export function PageFeedbackToolbarCSS({
                   )}
                   {isHovered && !editingAnnotation && (
                     <div
-                      className={`${styles.markerTooltip} ${!isDarkMode ? styles.light : ""} ${styles.enter}`}
+                      className={`${styles.markerTooltip} ${styles.enter}`}
                       style={getTooltipPosition(annotation)}
                     >
                       <span className={styles.markerQuote}>
@@ -3861,8 +3736,8 @@ export function PageFeedbackToolbarCSS({
                 (isHovered || isDeleting) && !editingAnnotation;
               const isMulti = annotation.isMultiSelect;
               const markerColor = isMulti
-                ? "#34C759"
-                : settings.annotationColor;
+                ? "var(--agentation-color-green)"
+                : "var(--agentation-accent)";
               const globalIndex = annotations.findIndex(
                 (a) => a.id === annotation.id,
               );
@@ -3933,7 +3808,7 @@ export function PageFeedbackToolbarCSS({
                   )}
                   {isHovered && !editingAnnotation && (
                     <div
-                      className={`${styles.markerTooltip} ${!isDarkMode ? styles.light : ""} ${styles.enter}`}
+                      className={`${styles.markerTooltip} ${styles.enter}`}
                       style={getTooltipPosition(annotation)}
                     >
                       <span className={styles.markerQuote}>
@@ -3996,8 +3871,8 @@ export function PageFeedbackToolbarCSS({
                   top: hoverInfo.rect.top,
                   width: hoverInfo.rect.width,
                   height: hoverInfo.rect.height,
-                  borderColor: `${settings.annotationColor}80`,
-                  backgroundColor: `${settings.annotationColor}0A`,
+                  borderColor: "color-mix(in srgb, var(--agentation-accent) 50%, transparent)",
+                  backgroundColor: "color-mix(in srgb, var(--agentation-accent) 4%, transparent)",
                 }}
               />
             )}
@@ -4026,8 +3901,8 @@ export function PageFeedbackToolbarCSS({
                     ...(isMulti
                       ? {}
                       : {
-                          borderColor: `${settings.annotationColor}99`,
-                          backgroundColor: `${settings.annotationColor}0D`,
+                          borderColor: "color-mix(in srgb, var(--agentation-accent) 60%, transparent)",
+                          backgroundColor: "color-mix(in srgb, var(--agentation-accent) 5%, transparent)",
                         }),
                   }}
                 />
@@ -4111,8 +3986,8 @@ export function PageFeedbackToolbarCSS({
                     ...(isMulti
                       ? {}
                       : {
-                          borderColor: `${settings.annotationColor}99`,
-                          backgroundColor: `${settings.annotationColor}0D`,
+                          borderColor: "color-mix(in srgb, var(--agentation-accent) 60%, transparent)",
+                          backgroundColor: "color-mix(in srgb, var(--agentation-accent) 5%, transparent)",
                         }),
                   }}
                 />
@@ -4183,8 +4058,8 @@ export function PageFeedbackToolbarCSS({
                               top: rect.top,
                               width: rect.width,
                               height: rect.height,
-                              borderColor: `${settings.annotationColor}99`,
-                              backgroundColor: `${settings.annotationColor}0D`,
+                              borderColor: "color-mix(in srgb, var(--agentation-accent) 60%, transparent)",
+                              backgroundColor: "color-mix(in srgb, var(--agentation-accent) 5%, transparent)",
                             }}
                           />
                         );
@@ -4201,8 +4076,8 @@ export function PageFeedbackToolbarCSS({
                             ...(pendingAnnotation.isMultiSelect
                               ? {}
                               : {
-                                  borderColor: `${settings.annotationColor}99`,
-                                  backgroundColor: `${settings.annotationColor}0D`,
+                                  borderColor: "color-mix(in srgb, var(--agentation-accent) 60%, transparent)",
+                                  backgroundColor: "color-mix(in srgb, var(--agentation-accent) 5%, transparent)",
                                 }),
                           }}
                         />
@@ -4223,8 +4098,8 @@ export function PageFeedbackToolbarCSS({
                         left: `${markerX}%`,
                         top: markerY,
                         backgroundColor: pendingAnnotation.isMultiSelect
-                          ? "#34C759"
-                          : settings.annotationColor,
+                          ? "var(--agentation-color-green)"
+                          : "var(--agentation-accent)",
                       }}
                     >
                       <IconPlus size={12} />
@@ -4248,8 +4123,8 @@ export function PageFeedbackToolbarCSS({
                       lightMode={!isDarkMode}
                       accentColor={
                         pendingAnnotation.isMultiSelect
-                          ? "#34C759"
-                          : settings.annotationColor
+                          ? "var(--agentation-color-green)"
+                          : "var(--agentation-accent)"
                       }
                       style={{
                         // Popup is 280px wide, centered with translateX(-50%), so 140px each side
@@ -4351,8 +4226,8 @@ export function PageFeedbackToolbarCSS({
                           ...(editingAnnotation.isMultiSelect
                             ? {}
                             : {
-                                borderColor: `${settings.annotationColor}99`,
-                                backgroundColor: `${settings.annotationColor}0D`,
+                                borderColor: "color-mix(in srgb, var(--agentation-accent) 60%, transparent)",
+                                backgroundColor: "color-mix(in srgb, var(--agentation-accent) 5%, transparent)",
                               }),
                         }}
                       />
@@ -4376,8 +4251,8 @@ export function PageFeedbackToolbarCSS({
                 lightMode={!isDarkMode}
                 accentColor={
                   editingAnnotation.isMultiSelect
-                    ? "#34C759"
-                    : settings.annotationColor
+                    ? "var(--agentation-color-green)"
+                    : "var(--agentation-accent)"
                 }
                 style={(() => {
                   const markerY = editingAnnotation.isFixed
