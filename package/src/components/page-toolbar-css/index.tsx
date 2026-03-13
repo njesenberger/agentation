@@ -214,6 +214,17 @@ const injectAgentationColorTokens = () => {
   if (typeof document === "undefined") return;
   const style = document.createElement("style");
   style.textContent = [
+    ...COLOR_OPTIONS.map(c => `
+      [data-agentation-accent="${c.id}"] {
+        --agentation-color-accent: ${c.srgb};
+      }
+
+      @supports (color: color(display-p3 0 0 0)) {
+        [data-agentation-accent="${c.id}"] {
+          --agentation-color-accent: ${c.p3};
+        }
+      }
+    `),
     `:root {
       ${COLOR_OPTIONS.map(c => `--agentation-color-${c.id}: ${c.srgb};`).join("\n")}
     }`,
@@ -2985,7 +2996,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
   };
 
   return createPortal(
-    <div ref={portalWrapperRef} style={{ display: "contents", "--agentation-accent": settings.annotationColorId } as React.CSSProperties} data-agentation-theme={isDarkMode ? "dark" : "light"}>
+    <div ref={portalWrapperRef} style={{ display: "contents" }} data-agentation-theme={isDarkMode ? "dark" : "light"} data-agentation-accent={settings.annotationColorId}>
       {/* Toolbar */}
       <div
         className={`${styles.toolbar}${userClassName ? ` ${userClassName}` : ""}`}
@@ -3609,7 +3620,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               const isMulti = annotation.isMultiSelect;
               const markerColor = isMulti
                 ? "#030404"
-                : "var(--agentation-accent)";
+                : "var(--agentation-color-accent)";
               const globalIndex = annotations.findIndex(
                 (a) => a.id === annotation.id,
               );
@@ -3737,7 +3748,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               const isMulti = annotation.isMultiSelect;
               const markerColor = isMulti
                 ? "var(--agentation-color-green)"
-                : "var(--agentation-accent)";
+                : "var(--agentation-color-accent)";
               const globalIndex = annotations.findIndex(
                 (a) => a.id === annotation.id,
               );
@@ -3871,8 +3882,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                   top: hoverInfo.rect.top,
                   width: hoverInfo.rect.width,
                   height: hoverInfo.rect.height,
-                  borderColor: "color-mix(in srgb, var(--agentation-accent) 50%, transparent)",
-                  backgroundColor: "color-mix(in srgb, var(--agentation-accent) 4%, transparent)",
+                  borderColor: "color-mix(in srgb, var(--agentation-color-accent) 50%, transparent)",
+                  backgroundColor: "color-mix(in srgb, var(--agentation-color-accent) 4%, transparent)",
                 }}
               />
             )}
@@ -3901,8 +3912,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                     ...(isMulti
                       ? {}
                       : {
-                          borderColor: "color-mix(in srgb, var(--agentation-accent) 60%, transparent)",
-                          backgroundColor: "color-mix(in srgb, var(--agentation-accent) 5%, transparent)",
+                          borderColor: "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
+                          backgroundColor: "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
                         }),
                   }}
                 />
@@ -3986,8 +3997,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                     ...(isMulti
                       ? {}
                       : {
-                          borderColor: "color-mix(in srgb, var(--agentation-accent) 60%, transparent)",
-                          backgroundColor: "color-mix(in srgb, var(--agentation-accent) 5%, transparent)",
+                          borderColor: "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
+                          backgroundColor: "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
                         }),
                   }}
                 />
@@ -4058,8 +4069,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                               top: rect.top,
                               width: rect.width,
                               height: rect.height,
-                              borderColor: "color-mix(in srgb, var(--agentation-accent) 60%, transparent)",
-                              backgroundColor: "color-mix(in srgb, var(--agentation-accent) 5%, transparent)",
+                              borderColor: "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
+                              backgroundColor: "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
                             }}
                           />
                         );
@@ -4076,8 +4087,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                             ...(pendingAnnotation.isMultiSelect
                               ? {}
                               : {
-                                  borderColor: "color-mix(in srgb, var(--agentation-accent) 60%, transparent)",
-                                  backgroundColor: "color-mix(in srgb, var(--agentation-accent) 5%, transparent)",
+                                  borderColor: "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
+                                  backgroundColor: "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
                                 }),
                           }}
                         />
@@ -4099,7 +4110,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                         top: markerY,
                         backgroundColor: pendingAnnotation.isMultiSelect
                           ? "var(--agentation-color-green)"
-                          : "var(--agentation-accent)",
+                          : "var(--agentation-color-accent)",
                       }}
                     >
                       <IconPlus size={12} />
@@ -4124,7 +4135,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                       accentColor={
                         pendingAnnotation.isMultiSelect
                           ? "var(--agentation-color-green)"
-                          : "var(--agentation-accent)"
+                          : "var(--agentation-color-accent)"
                       }
                       style={{
                         // Popup is 280px wide, centered with translateX(-50%), so 140px each side
@@ -4226,8 +4237,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                           ...(editingAnnotation.isMultiSelect
                             ? {}
                             : {
-                                borderColor: "color-mix(in srgb, var(--agentation-accent) 60%, transparent)",
-                                backgroundColor: "color-mix(in srgb, var(--agentation-accent) 5%, transparent)",
+                                borderColor: "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
+                                backgroundColor: "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
                               }),
                         }}
                       />
@@ -4252,7 +4263,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                 accentColor={
                   editingAnnotation.isMultiSelect
                     ? "var(--agentation-color-green)"
-                    : "var(--agentation-accent)"
+                    : "var(--agentation-color-accent)"
                 }
                 style={(() => {
                   const markerY = editingAnnotation.isFixed

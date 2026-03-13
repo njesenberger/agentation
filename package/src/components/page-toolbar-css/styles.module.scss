@@ -372,7 +372,7 @@
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background-color: var(--agentation-accent);
+  background-color: var(--agentation-color-accent);
   color: white;
   font-size: 0.625rem;
   font-weight: 600;
@@ -497,7 +497,7 @@
   height: 16px;
   padding: 0 4px;
   border-radius: 8px;
-  background-color: var(--agentation-accent);
+  background-color: var(--agentation-color-accent);
   color: white;
   font-size: 0.625rem;
   font-weight: 600;
@@ -841,11 +841,11 @@
 .hoverHighlight {
   position: fixed;
   border: 2px solid
-    color-mix(in srgb, var(--agentation-accent) 50%, transparent);
+    color-mix(in srgb, var(--agentation-color-accent) 50%, transparent);
   border-radius: 4px;
   background-color: color-mix(
     in srgb,
-    var(--agentation-accent) 4%,
+    var(--agentation-color-accent) 4%,
     transparent
   );
   pointer-events: none !important;
@@ -861,12 +861,12 @@
 .multiSelectOutline {
   position: fixed;
   border: 2px dashed
-    color-mix(in srgb, var(--agentation-accent) 60%, transparent);
+    color-mix(in srgb, var(--agentation-color-accent) 60%, transparent);
   border-radius: 4px;
   pointer-events: none !important;
   background-color: color-mix(
     in srgb,
-    var(--agentation-accent) 5%,
+    var(--agentation-color-accent) 5%,
     transparent
   );
   box-sizing: border-box;
@@ -1546,7 +1546,7 @@
 }
 
 .settingsBrandSlash {
-  color: var(--agentation-accent);
+  color: var(--agentation-color-accent);
   transition: color 0.2s ease;
 }
 
