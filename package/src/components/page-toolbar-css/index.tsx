@@ -3619,7 +3619,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                 (isHovered || isDeleting) && !editingAnnotation;
               const isMulti = annotation.isMultiSelect;
               const markerColor = isMulti
-                ? "#030404"
+                ? "var(--agentation-color-green)"
                 : "var(--agentation-color-accent)";
               const globalIndex = annotations.findIndex(
                 (a) => a.id === annotation.id,
