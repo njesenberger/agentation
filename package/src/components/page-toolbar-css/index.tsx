@@ -212,7 +212,9 @@ const COLOR_OPTIONS = [
 
 const injectAgentationColorTokens = () => {
   if (typeof document === "undefined") return;
+  if (document.getElementById("agentation-color-tokens")) return;
   const style = document.createElement("style");
+  style.id = "agentation-color-tokens";
   style.textContent = [
     ...COLOR_OPTIONS.map(c => `
       [data-agentation-accent="${c.id}"] {

@@ -861,12 +861,12 @@
 .multiSelectOutline {
   position: fixed;
   border: 2px dashed
-    color-mix(in srgb, var(--agentation-color-accent) 60%, transparent);
+    color-mix(in srgb, var(--agentation-color-green) 60%, transparent);
   border-radius: 4px;
   pointer-events: none !important;
   background-color: color-mix(
     in srgb,
-    var(--agentation-color-accent) 5%,
+    var(--agentation-color-green) 5%,
     transparent
   );
   box-sizing: border-box;
@@ -2222,7 +2222,7 @@
       );
     }
 
-    [data-error="true"] {
+    &[data-error="true"] {
       color: var(--agentation-color-red);
       background: color-mix(
         in srgb,
@@ -2231,7 +2231,7 @@
       );
     }
 
-    [data-danger]:hover:not(:disabled):not([data-active="true"]):not(
+    &[data-danger]:hover:not(:disabled):not([data-active="true"]):not(
         [data-failed="true"]
       ) {
       color: var(--agentation-color-red);
@@ -2242,13 +2242,13 @@
       );
     }
 
-    [data-auto-sync="true"] {
+    &[data-auto-sync="true"] {
       color: var(--agentation-color-green);
       background: transparent;
     }
 
     // Failed state (no listeners)
-    [data-failed="true"] {
+    &[data-failed="true"] {
       color: var(--agentation-color-red);
       background: color-mix(
         in srgb,
