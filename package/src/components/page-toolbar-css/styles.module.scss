@@ -120,28 +120,6 @@
   }
 }
 
-@keyframes markerIn {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.3);
-  }
-  100% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-}
-
-@keyframes markerOut {
-  0% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.3);
-  }
-}
-
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -157,19 +135,6 @@
   }
   to {
     opacity: 0;
-  }
-}
-
-@keyframes tooltipIn {
-  from {
-    opacity: 0;
-    // 0.891 = 0.98 * 0.909 (animation start × counter-scale)
-    transform: translateX(-50%) translateY(2px) scale(0.891);
-  }
-  to {
-    opacity: 1;
-    // 0.909 = 1/1.1 counter-scale to offset parent marker's hover scale
-    transform: translateX(-50%) translateY(0) scale(0.909);
   }
 }
 
@@ -192,32 +157,6 @@
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
-  }
-}
-
-@keyframes settingsPanelIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.95);
-    filter: blur(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0px);
-  }
-}
-
-@keyframes settingsPanelOut {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0px);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(20px) scale(0.95);
-    filter: blur(5px);
   }
 }
 
@@ -270,18 +209,11 @@
     0 2px 8px rgba(0, 0, 0, 0.2),
     0 4px 16px rgba(0, 0, 0, 0.1);
   pointer-events: auto;
-  cursor: grab;
 
   // Animated properties
   transition:
     width 0.4s cubic-bezier(0.19, 1, 0.22, 1),
     transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-
-  &.dragging {
-    // Remove transition while dragging for immediate feedback
-    transition: width 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-    cursor: grabbing;
-  }
 
   &.entrance {
     animation: toolbarEnter 0.5s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
@@ -406,7 +338,7 @@
 
 .controlButton {
   position: relative;
-  cursor: pointer !important;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -471,19 +403,17 @@
 
   &[data-no-hover="true"],
   &.statusShowing {
-    cursor: default !important;
+    cursor: default;
     pointer-events: none;
     background: transparent !important;
   }
 
-  // Auto-sync mode (Claude Code) - green, non-interactive
   &[data-auto-sync="true"] {
     color: var(--agentation-color-green);
     background: transparent;
     cursor: default;
   }
 
-  // Failed state (no listeners) - red like danger hover
   &[data-failed="true"] {
     color: var(--agentation-color-red);
     background-color: color-mix(
@@ -636,7 +566,6 @@
   align-items: center;
   justify-content: center;
 
-  // Show tooltip on wrapper hover (with delay)
   &:hover .buttonTooltip {
     opacity: 1;
     visibility: visible;
@@ -644,7 +573,6 @@
     transition-delay: 0.85s;
   }
 
-  // Don't show tooltip if button inside is disabled
   &:has(.controlButton:disabled):hover .buttonTooltip {
     opacity: 0;
     visibility: hidden;
@@ -655,13 +583,12 @@
   transition-delay: 0s;
 }
 
-// Send button wrapper - animates width when MCP connects/disconnects
 .sendButtonWrapper {
   width: 0;
   opacity: 0;
   overflow: hidden;
   pointer-events: none;
-  margin-left: -0.375rem; // Collapse the gap when hidden
+  margin-left: -0.375rem;
   transition:
     width 0.4s cubic-bezier(0.19, 1, 0.22, 1),
     opacity 0.3s cubic-bezier(0.19, 1, 0.22, 1),
@@ -685,7 +612,6 @@
   }
 }
 
-// Toolbar Button Tooltips
 .buttonTooltip {
   position: absolute;
   bottom: calc(100% + 14px);
@@ -708,7 +634,6 @@
     transform 0.135s ease,
     visibility 0.135s ease;
 
-  // Arrow pointing down (rotated square with rounded tip)
   &::after {
     content: "";
     position: absolute;
@@ -722,13 +647,11 @@
   }
 }
 
-// Keyboard shortcut in tooltip
 .shortcut {
   margin-left: 4px;
   opacity: 0.5;
 }
 
-// Flipped position (tooltip below) - when toolbar near top
 .tooltipBelow .buttonTooltip {
   bottom: auto;
   top: calc(100% + 14px);
@@ -745,15 +668,12 @@
   transform: translateX(-50%) scale(1);
 }
 
-// Hide tooltips immediately after button click
 .tooltipsHidden .buttonTooltip {
   opacity: 0 !important;
   visibility: hidden !important;
   transition: none !important;
 }
 
-// Force tooltip visible (e.g., after Send to Agent click)
-// Needs to override .tooltipsHidden specificity
 .tooltipVisible,
 .tooltipsHidden .tooltipVisible {
   opacity: 1 !important;
@@ -762,8 +682,6 @@
   transition-delay: 0s !important;
 }
 
-// Left-aligned tooltip (for buttons near left edge)
-// Applied directly to buttonWrapper
 .buttonWrapperAlignLeft {
   .buttonTooltip {
     left: 50%;
@@ -789,8 +707,6 @@
   }
 }
 
-// Right-aligned tooltip (for buttons near right edge)
-// Applied directly to buttonWrapper
 .buttonWrapperAlignRight {
   .buttonTooltip {
     left: 50%;
@@ -974,1161 +890,6 @@
 }
 
 // =============================================================================
-// Annotation Markers
-// =============================================================================
-
-.marker {
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  background: var(--agentation-color-blue);
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  transform: translate(-50%, -50%) scale(1);
-  opacity: 1;
-  cursor: pointer;
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.2),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.04);
-  user-select: none;
-  will-change: transform, opacity;
-  contain: layout style;
-  z-index: 1;
-
-  &:hover {
-    z-index: 2;
-  }
-
-  // Only apply transitions when NOT animating
-  &:not(.enter):not(.exit):not(.clearing) {
-    transition:
-      background-color 0.15s ease,
-      transform 0.1s ease;
-  }
-
-  &.enter {
-    animation: markerIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-
-  &.exit {
-    animation: markerOut 0.2s ease-out both;
-    pointer-events: none;
-  }
-
-  &.clearing {
-    animation: markerOut 0.15s ease-out both;
-    pointer-events: none;
-  }
-
-  // Only apply hover scale when not animating
-  &:not(.enter):not(.exit):not(.clearing):hover {
-    transform: translate(-50%, -50%) scale(1.1);
-  }
-
-  &.pending {
-    position: fixed;
-    background-color: var(--agentation-color-blue);
-  }
-
-  &.fixed {
-    position: fixed;
-  }
-
-  &.multiSelect {
-    background-color: var(--agentation-color-green);
-    width: 26px;
-    height: 26px;
-    border-radius: 6px;
-    font-size: 0.75rem;
-
-    &.pending {
-      background-color: var(--agentation-color-green);
-    }
-  }
-
-  &.hovered {
-    background-color: var(--agentation-color-red);
-  }
-}
-
-.renumber {
-  display: block;
-  animation: renumberRoll 0.2s ease-out;
-}
-
-@keyframes renumberRoll {
-  0% {
-    transform: translateX(-40%);
-    opacity: 0;
-  }
-  100% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.markerTooltip {
-  position: absolute;
-  top: calc(100% + 10px);
-  left: 50%;
-  // Counter-scale to offset the parent marker's 1.1x hover scale
-  transform: translateX(-50%) scale(0.909);
-  z-index: 100002;
-  background: #1a1a1a;
-  padding: 8px 0.75rem;
-  border-radius: 0.75rem;
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
-  font-weight: 400;
-  color: #fff;
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(255, 255, 255, 0.08);
-  min-width: 120px;
-  max-width: 200px;
-  pointer-events: none;
-  cursor: default;
-
-  &.enter {
-    animation: tooltipIn 0.1s ease-out forwards;
-  }
-}
-
-.markerQuote {
-  display: block;
-  font-size: 12px;
-  font-style: italic;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: 0.3125rem;
-  line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.markerNote {
-  display: block;
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.4;
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding-bottom: 2px;
-}
-
-.markerHint {
-  display: block;
-  font-size: 0.625rem;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.6);
-  margin-top: 0.375rem;
-  white-space: nowrap;
-}
-
-// =============================================================================
-// Settings Panel
-// =============================================================================
-
-.settingsPanel {
-  position: absolute;
-  right: 5px;
-  bottom: calc(100% + 0.5rem);
-  z-index: 1;
-  overflow: hidden;
-  background: #1c1c1c;
-  border-radius: 1rem;
-  padding: 13px 0 16px;
-  min-width: 205px;
-  cursor: default;
-  opacity: 1;
-  box-shadow:
-    0 1px 8px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(0, 0, 0, 0.04);
-  transition:
-    background-color 0.25s ease,
-    box-shadow 0.25s ease;
-
-  // Gradient overlays for smooth edge fade during transitions
-  &::before,
-  &::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 16px;
-    z-index: 2;
-    pointer-events: none;
-  }
-
-  &::before {
-    left: 0;
-    background: linear-gradient(to right, #1c1c1c 0%, transparent 100%);
-  }
-
-  &::after {
-    right: 0;
-    background: linear-gradient(to left, #1c1c1c 0%, transparent 100%);
-  }
-
-  // Transition for all child elements
-  .settingsHeader,
-  .settingsBrand,
-  .settingsBrandSlash,
-  .settingsVersion,
-  .settingsSection,
-  .settingsLabel,
-  .cycleButton,
-  .cycleDot,
-  .dropdownButton,
-  .toggleLabel,
-  .customCheckbox,
-  .sliderLabel,
-  .slider,
-  .themeToggle {
-    transition:
-      background-color 0.25s ease,
-      color 0.25s ease,
-      border-color 0.25s ease;
-  }
-
-  &.enter {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0px);
-    transition:
-      opacity 0.2s ease,
-      transform 0.2s ease,
-      filter 0.2s ease;
-  }
-
-  &.exit {
-    opacity: 0;
-    transform: translateY(8px) scale(0.95);
-    filter: blur(5px);
-    pointer-events: none;
-    transition:
-      opacity 0.1s ease,
-      transform 0.1s ease,
-      filter 0.1s ease;
-  }
-
-  [data-agentation-theme="dark"] & {
-    background: #1a1a1a;
-    box-shadow:
-      0 4px 20px rgba(0, 0, 0, 0.3),
-      0 0 0 1px rgba(255, 255, 255, 0.08);
-
-    .settingsLabel {
-      color: rgba(255, 255, 255, 0.6);
-    }
-
-    .settingsOption {
-      color: rgba(255, 255, 255, 0.85);
-
-      &:hover {
-        background: rgba(255, 255, 255, 0.1);
-      }
-
-      &.selected {
-        background: rgba(255, 255, 255, 0.15);
-        color: #fff;
-      }
-    }
-
-    .toggleLabel {
-      color: rgba(255, 255, 255, 0.85);
-    }
-  }
-}
-
-// Sliding panel container for main/automations pages
-.settingsPanelContainer {
-  overflow: visible;
-  position: relative;
-  display: flex;
-  padding: 0 1rem;
-}
-
-.settingsPage {
-  min-width: 100%;
-  flex-shrink: 0;
-  transition:
-    transform 0.2s ease,
-    opacity 0.2s ease;
-  transition-delay: 0s;
-  opacity: 1;
-}
-
-.settingsPage.slideLeft {
-  transform: translateX(-24px);
-  opacity: 0;
-  pointer-events: none;
-}
-
-.automationsPage {
-  position: absolute;
-  top: 0;
-  left: 24px;
-  width: 100%;
-  height: 100%;
-  padding: 3px 1rem 0;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  transition:
-    transform 0.2s ease,
-    opacity 0.2s ease;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.automationsPage.slideIn {
-  transform: translateX(-24px);
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.settingsNavLink {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0;
-  border: none;
-  background: transparent;
-  font-family: inherit;
-  font-size: 0.8125rem;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.5);
-  cursor: pointer;
-  transition: color 0.15s ease;
-
-  &:hover {
-    color: rgba(255, 255, 255, 0.9);
-  }
-
-  [data-agentation-theme="light"] & {
-    color: rgba(0, 0, 0, 0.5);
-
-    &:hover {
-      color: rgba(0, 0, 0, 0.8);
-    }
-  }
-
-  svg {
-    color: rgba(255, 255, 255, 0.4);
-    transition: color 0.15s ease;
-  }
-
-  &:hover svg {
-    color: #fff;
-  }
-
-  [data-agentation-theme="light"] & svg {
-    color: rgba(0, 0, 0, 0.25);
-  }
-
-  [data-agentation-theme="light"] &:hover svg {
-    color: rgba(0, 0, 0, 0.8);
-  }
-}
-
-.settingsNavLinkRight {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.mcpNavIndicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-
-  &.connected {
-    background-color: var(--agentation-color-green);
-    animation: mcpPulse 2.5s ease-in-out infinite;
-  }
-
-  &.connecting {
-    background-color: var(--agentation-color-yellow);
-    animation: mcpPulse 1.5s ease-in-out infinite;
-  }
-}
-
-.settingsBackButton {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 0 12px 0;
-  margin: -6px 0 0.5rem 0;
-  border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 0;
-  background: transparent;
-  font-family: inherit;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  letter-spacing: -0.15px;
-  color: #fff;
-  cursor: pointer;
-  transition: transform 0.12s cubic-bezier(0.32, 0.72, 0, 1);
-
-  svg {
-    opacity: 0.4;
-    flex-shrink: 0;
-    transition:
-      opacity 0.15s ease,
-      transform 0.18s cubic-bezier(0.32, 0.72, 0, 1);
-  }
-
-  &:hover {
-    border-bottom-color: rgba(255, 255, 255, 0.07);
-
-    svg {
-      opacity: 1;
-    }
-  }
-
-  [data-agentation-theme="light"] & {
-    color: rgba(0, 0, 0, 0.85);
-    border-bottom-color: rgba(0, 0, 0, 0.08);
-
-    &:hover {
-      border-bottom-color: rgba(0, 0, 0, 0.08);
-    }
-  }
-}
-
-.automationHeader {
-  display: flex;
-  align-items: center;
-  gap: 0.125rem;
-  font-size: 0.8125rem;
-  font-weight: 400;
-  color: #fff;
-
-  [data-agentation-theme="light"] & {
-    color: rgba(0, 0, 0, 0.85);
-  }
-}
-
-.automationDescription {
-  font-size: 0.6875rem;
-  font-weight: 300;
-  color: rgba(255, 255, 255, 0.5);
-  margin-top: 2px;
-  line-height: 14px;
-
-  [data-agentation-theme="light"] & {
-    color: rgba(0, 0, 0, 0.5);
-  }
-}
-
-.learnMoreLink {
-  color: rgba(255, 255, 255, 0.8);
-  text-decoration: underline dotted;
-  text-decoration-color: rgba(255, 255, 255, 0.2);
-  text-underline-offset: 2px;
-  transition: color 0.15s ease;
-
-  &:hover {
-    color: #fff;
-  }
-
-  [data-agentation-theme="light"] & {
-    color: rgba(0, 0, 0, 0.6);
-    text-decoration-color: rgba(0, 0, 0, 0.2);
-
-    &:hover {
-      color: rgba(0, 0, 0, 0.85);
-    }
-  }
-}
-
-.autoSendRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.autoSendLabel {
-  font-size: 0.6875rem;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.4);
-  transition: color 0.15s ease;
-
-  &.active {
-    color: #66b8ff;
-    color: color(display-p3 0.4 0.72 1);
-  }
-
-  [data-agentation-theme="light"] & {
-    color: rgba(0, 0, 0, 0.4);
-
-    &.active {
-      color: var(--agentation-color-blue);
-    }
-  }
-}
-
-.webhookUrlInput {
-  display: block;
-  width: 100%;
-  flex: 1;
-  min-height: 60px;
-  box-sizing: border-box;
-  margin-top: 11px;
-  padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.03);
-  font-family: inherit;
-  font-size: 0.75rem;
-  font-weight: 400;
-  color: #fff;
-  outline: none;
-  resize: none;
-  cursor: text !important;
-  user-select: text;
-  transition:
-    border-color 0.15s ease,
-    background-color 0.15s ease,
-    box-shadow 0.15s ease;
-
-  &::placeholder {
-    color: rgba(255, 255, 255, 0.3);
-  }
-
-  &:focus {
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  [data-agentation-theme="light"] & {
-    border-color: rgba(0, 0, 0, 0.1);
-    background: rgba(0, 0, 0, 0.03);
-    color: rgba(0, 0, 0, 0.85);
-
-    &::placeholder {
-      color: rgba(0, 0, 0, 0.3);
-    }
-
-    &:focus {
-      border-color: rgba(0, 0, 0, 0.25);
-      background: rgba(0, 0, 0, 0.05);
-    }
-  }
-}
-
-.settingsHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 24px;
-  margin-bottom: 0.5rem;
-  padding-bottom: 9px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.settingsBrand {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: -0.0094em;
-  color: #fff;
-}
-
-.settingsBrandSlash {
-  color: var(--agentation-color-accent);
-  transition: color 0.2s ease;
-}
-
-.settingsVersion {
-  font-size: 11px;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.4);
-  margin-left: auto;
-  letter-spacing: -0.0094em;
-}
-
-.settingsSection {
-  & + & {
-    margin-top: 0.5rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
-  }
-
-  &.settingsSectionExtraPadding {
-    padding-top: calc(0.5rem + 4px);
-  }
-}
-
-.settingsSectionGrow {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.settingsRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 24px;
-
-  &.settingsRowMarginTop {
-    margin-top: 8px;
-  }
-}
-
-.dropdownContainer {
-  position: relative;
-}
-
-.dropdownButton {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
-  border: none;
-  border-radius: 0.375rem;
-  background: transparent;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #fff;
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    color 0.15s ease;
-  letter-spacing: -0.0094em;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  svg {
-    opacity: 0.6;
-  }
-}
-
-// Old dropdown styles kept for potential future use
-// @keyframes dropdownTextFade removed - using cycle button instead
-
-.cycleButton {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0;
-  border: none;
-  background: transparent;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: #fff;
-  cursor: pointer;
-  letter-spacing: -0.0094em;
-
-  [data-agentation-theme="light"] & {
-    color: rgba(0, 0, 0, 0.85);
-  }
-
-  &:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-  }
-}
-
-.settingsRowDisabled {
-  .settingsLabel {
-    color: rgba(255, 255, 255, 0.2);
-
-    [data-agentation-theme="light"] & {
-      color: rgba(0, 0, 0, 0.2);
-    }
-  }
-
-  .toggleSwitch {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-}
-
-@keyframes cycleTextIn {
-  0% {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.cycleButtonText {
-  display: inline-block;
-  animation: cycleTextIn 0.2s ease-out;
-}
-
-.cycleDots {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.cycleDot {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(0.667);
-  transition:
-    background-color 0.25s ease-out,
-    transform 0.25s ease-out;
-
-  &.active {
-    background: #fff;
-    transform: scale(1);
-  }
-
-  [data-agentation-theme="light"] & {
-    background: rgba(0, 0, 0, 0.2);
-
-    &.active {
-      background: rgba(0, 0, 0, 0.7);
-    }
-  }
-}
-
-.dropdownMenu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 0.25rem);
-  background: #1a1a1a;
-  border-radius: 0.5rem;
-  padding: 0.25rem;
-  min-width: 120px;
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(255, 255, 255, 0.1);
-  z-index: 10;
-  animation: scaleIn 0.15s ease-out;
-}
-
-.dropdownItem {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  padding: 0.5rem 0.625rem;
-  border: none;
-  border-radius: 0.375rem;
-  background: transparent;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
-  cursor: pointer;
-  text-align: left;
-  transition:
-    background-color 0.15s ease,
-    color 0.15s ease;
-  letter-spacing: -0.0094em;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  &.selected {
-    background: rgba(255, 255, 255, 0.12);
-    color: #fff;
-    font-weight: 600;
-  }
-}
-
-.settingsLabel {
-  font-size: 0.8125rem;
-  font-weight: 400;
-  letter-spacing: -0.0094em;
-  color: rgba(255, 255, 255, 0.5);
-  display: flex;
-  align-items: center;
-  gap: 0.125rem;
-
-  [data-agentation-theme="light"] & {
-    color: rgba(0, 0, 0, 0.5);
-  }
-}
-
-.settingsLabelMarker {
-  padding-top: 3px;
-  margin-bottom: 10px;
-}
-
-.settingsOptions {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.settingsOption {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  padding: 0.375rem 0.5rem;
-  border: none;
-  border-radius: 0.375rem;
-  background: transparent;
-  font-size: 0.6875rem;
-  font-weight: 500;
-  color: rgba(0, 0, 0, 0.7);
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    color 0.15s ease;
-
-  &:hover {
-    background: rgba(0, 0, 0, 0.05);
-  }
-
-  &.selected {
-    background: color-mix(
-      in srgb,
-      var(--agentation-color-blue) 15%,
-      transparent
-    );
-    color: var(--agentation-color-blue);
-  }
-}
-
-.sliderContainer {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.slider {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 2px;
-  outline: none;
-  cursor: pointer;
-
-  &::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 14px;
-    height: 14px;
-    background: white;
-    border-radius: 50%;
-    cursor: pointer;
-    transition:
-      transform 0.15s ease,
-      box-shadow 0.15s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  }
-
-  &::-moz-range-thumb {
-    width: 14px;
-    height: 14px;
-    background: white;
-    border: none;
-    border-radius: 50%;
-    cursor: pointer;
-    transition:
-      transform 0.15s ease,
-      box-shadow 0.15s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  }
-
-  &:hover::-webkit-slider-thumb {
-    transform: scale(1.15);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  }
-
-  &:hover::-moz-range-thumb {
-    transform: scale(1.15);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  }
-}
-
-.sliderLabels {
-  display: flex;
-  justify-content: space-between;
-}
-
-.sliderLabel {
-  font-size: 0.625rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.4);
-  cursor: pointer;
-  transition: color 0.15s ease;
-
-  &:hover {
-    color: rgba(255, 255, 255, 0.7);
-  }
-
-  &.active {
-    color: rgba(255, 255, 255, 0.9);
-  }
-}
-
-.colorOptions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.375rem;
-  margin-bottom: 1px;
-}
-
-.colorOption {
-  display: block;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  background-color: var(--swatch);
-  cursor: pointer;
-  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
-
-  @supports (color: color(display-p3 0 0 0)) {
-    background-color: var(--swatch-p3);
-  }
-
-  &:hover {
-    transform: scale(1.15);
-  }
-
-  &.selected {
-    transform: scale(0.83);
-  }
-}
-
-.colorOptionRing {
-  display: flex;
-  width: 24px;
-  height: 24px;
-  border: 2px solid transparent;
-  border-radius: 50%;
-  transition: border-color 0.3s ease;
-
-  &.selected {
-    border-color: var(--swatch);
-
-    @supports (color: color(display-p3 0 0 0)) {
-      border-color: var(--swatch-p3);
-    }
-  }
-}
-
-.settingsToggle {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-
-  & + & {
-    margin-top: calc(0.5rem + 6px);
-  }
-
-  input[type="checkbox"] {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-
-  &.settingsToggleMarginBottom {
-    margin-bottom: calc(0.5rem + 6px);
-  }
-}
-
-.customCheckbox {
-  position: relative;
-  width: 14px;
-  height: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.05);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition:
-    background-color 0.25s ease,
-    border-color 0.25s ease;
-
-  svg {
-    color: #1a1a1a;
-    opacity: 1;
-    transition: opacity 0.15s ease;
-  }
-
-  input[type="checkbox"]:checked + & {
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(255, 255, 255, 1);
-  }
-
-  // Light mode variant (unchecked state)
-  [data-agentation-theme="light"] & {
-    border: 1px solid rgba(0, 0, 0, 0.15);
-    background: #fff;
-
-    // Checked state in light mode
-    &.checked {
-      border-color: #1a1a1a;
-      background: #1a1a1a;
-
-      svg {
-        color: #fff;
-      }
-    }
-  }
-}
-
-.toggleLabel {
-  font-size: 0.8125rem;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.5);
-  letter-spacing: -0.0094em;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-
-  [data-agentation-theme="light"] & {
-    color: rgba(0, 0, 0, 0.5);
-  }
-}
-
-// iOS-style toggle switch
-.toggleSwitch {
-  position: relative;
-  display: inline-block;
-  width: 24px;
-  height: 16px;
-  flex-shrink: 0;
-  cursor: pointer;
-  transition:
-    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-
-  input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-
-  input:checked + .toggleSlider {
-    background-color: var(--agentation-color-blue);
-  }
-
-  input:checked + .toggleSlider::before {
-    transform: translateX(8px);
-  }
-
-  &.disabled {
-    opacity: 0.4;
-    pointer-events: none;
-
-    .toggleSlider {
-      cursor: not-allowed;
-    }
-  }
-}
-
-.toggleSlider {
-  position: absolute;
-  cursor: pointer;
-  inset: 0;
-  border-radius: 16px;
-  background: #484848; // Dark mode unchecked
-
-  [data-agentation-theme="light"] & {
-    background: #dddddd; // Light mode unchecked
-  }
-
-  &::before {
-    content: "";
-    position: absolute;
-    height: 12px;
-    width: 12px;
-    left: 2px;
-    bottom: 2px;
-    background: white;
-    border-radius: 50%;
-    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-}
-
-// MCP Status Dot
-@keyframes mcpPulse {
-  0% {
-    box-shadow: 0 0 0 0
-      color-mix(in srgb, var(--agentation-color-green) 50%, transparent);
-  }
-  70% {
-    box-shadow: 0 0 0 6px
-      color-mix(in srgb, var(--agentation-color-green) 0%, transparent);
-  }
-  100% {
-    box-shadow: 0 0 0 0
-      color-mix(in srgb, var(--agentation-color-green) 0%, transparent);
-  }
-}
-
-@keyframes mcpPulseError {
-  0% {
-    box-shadow: 0 0 0 0
-      color-mix(in srgb, var(--agentation-color-red) 50%, transparent);
-  }
-
-  70% {
-    box-shadow: 0 0 0 6px
-      color-mix(in srgb, var(--agentation-color-red) 0%, transparent);
-  }
-
-  100% {
-    box-shadow: 0 0 0 0
-      color-mix(in srgb, var(--agentation-color-red) 0%, transparent);
-  }
-}
-
-.mcpStatusDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-
-  // Connecting state
-  &.connecting {
-    background-color: var(--agentation-color-yellow);
-    animation: mcpPulse 1.5s infinite;
-  }
-
-  // Connected state - subtle pulse
-  &.connected {
-    background-color: var(--agentation-color-green);
-    animation: mcpPulse 2.5s ease-in-out infinite;
-  }
-
-  // Disconnected/error state
-  &.disconnected {
-    background-color: var(--agentation-color-red);
-    animation: mcpPulseError 2s infinite;
-  }
-}
-
-// =============================================================================
 // Drag Selection
 // =============================================================================
 
@@ -2191,7 +952,6 @@
 // =============================================================================
 
 [data-agentation-theme="light"] {
-  // Toolbar container
   .toolbarContainer {
     background: #fff;
     color: rgba(0, 0, 0, 0.85);
@@ -2205,7 +965,6 @@
     }
   }
 
-  // Control buttons in toolbar
   .controlButton {
     color: rgba(0, 0, 0, 0.5);
 
@@ -2252,7 +1011,6 @@
       background: transparent;
     }
 
-    // Failed state (no listeners)
     &[data-failed="true"] {
       color: var(--agentation-color-red);
       background: color-mix(
@@ -2263,7 +1021,6 @@
     }
   }
 
-  // Button tooltips
   .buttonTooltip {
     background: #fff;
     color: rgba(0, 0, 0, 0.85);
@@ -2277,186 +1034,7 @@
     }
   }
 
-  // Divider
   .divider {
     background: rgba(0, 0, 0, 0.1);
-  }
-
-  // Marker tooltip
-  .markerTooltip {
-    background: #fff;
-    box-shadow:
-      0 4px 20px rgba(0, 0, 0, 0.12),
-      0 0 0 1px rgba(0, 0, 0, 0.06);
-
-    .markerQuote {
-      color: rgba(0, 0, 0, 0.5);
-    }
-
-    .markerNote {
-      color: rgba(0, 0, 0, 0.85);
-    }
-
-    .markerHint {
-      color: rgba(0, 0, 0, 0.35);
-    }
-  }
-
-  // Settings panel
-  .settingsPanel {
-    background: #fff;
-    box-shadow:
-      0 2px 8px rgba(0, 0, 0, 0.08),
-      0 4px 16px rgba(0, 0, 0, 0.06),
-      0 0 0 1px rgba(0, 0, 0, 0.04);
-
-    &::before {
-      background: linear-gradient(to right, #fff 0%, transparent 100%);
-    }
-
-    &::after {
-      background: linear-gradient(to left, #fff 0%, transparent 100%);
-    }
-
-    .settingsHeader {
-      border-bottom-color: rgba(0, 0, 0, 0.08);
-    }
-
-    .settingsBrand {
-      color: rgba(0, 0, 0, 0.85);
-    }
-
-    .settingsVersion {
-      color: rgba(0, 0, 0, 0.4);
-    }
-
-    .settingsSection {
-      border-top-color: rgba(0, 0, 0, 0.08);
-    }
-
-    .settingsLabel {
-      color: rgba(0, 0, 0, 0.5);
-    }
-
-    .cycleButton {
-      color: rgba(0, 0, 0, 0.85);
-    }
-
-    .cycleDot {
-      background: rgba(0, 0, 0, 0.2);
-
-      &.active {
-        background: rgba(0, 0, 0, 0.7);
-      }
-    }
-
-    .dropdownButton {
-      color: rgba(0, 0, 0, 0.85);
-
-      &:hover {
-        background: rgba(0, 0, 0, 0.05);
-      }
-    }
-
-    .toggleLabel {
-      color: rgba(0, 0, 0, 0.5);
-    }
-
-    .customCheckbox {
-      border: 1px solid rgba(0, 0, 0, 0.15);
-      background: #fff;
-
-      &.checked {
-        border-color: #1a1a1a;
-        background: #1a1a1a;
-
-        svg {
-          color: #fff;
-        }
-      }
-    }
-
-    .sliderLabel {
-      color: rgba(0, 0, 0, 0.4);
-
-      &:hover {
-        color: rgba(0, 0, 0, 0.7);
-      }
-
-      &.active {
-        color: rgba(0, 0, 0, 0.9);
-      }
-    }
-
-    .slider {
-      background: rgba(0, 0, 0, 0.1);
-
-      &::-webkit-slider-thumb {
-        background: #1a1a1a;
-      }
-
-      &::-moz-range-thumb {
-        background: #1a1a1a;
-      }
-    }
-  }
-}
-
-// Theme toggle button (works in both modes)
-.themeToggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  margin-left: 0.5rem;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.4);
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    color 0.15s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.8);
-  }
-
-  [data-agentation-theme="light"] & {
-    color: rgba(0, 0, 0, 0.4);
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.06);
-      color: rgba(0, 0, 0, 0.7);
-    }
-  }
-}
-
-.themeIconWrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  width: 20px;
-  height: 20px;
-}
-
-.themeIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: themeIconIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-@keyframes themeIconIn {
-  0% {
-    opacity: 0;
-    transform: scale(0.8) rotate(-30deg);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) rotate(0deg);
   }
 }

@@ -9,35 +9,13 @@ import {
 } from "../annotation-popup-css";
 import {
   IconListSparkle,
-  IconPlayAlt,
-  IconPauseAlt,
-  IconClose,
-  IconPlus,
   IconGear,
-  IconCheck,
-  IconCheckSmall,
-  IconCheckSmallAnimated,
-  IconHelp,
-  AnimatedBunny,
-  IconEye,
-  IconEyeMinus,
-  IconCopyAlt,
   IconCopyAnimated,
   IconSendArrow,
   IconTrashAlt,
-  IconXmark,
-  IconCheckmark,
-  IconCheckmarkLarge,
-  IconCheckmarkCircle,
-  IconPause,
   IconEyeAnimated,
   IconPausePlayAnimated,
-  IconSun,
-  IconMoon,
   IconXmarkLarge,
-  IconEdit,
-  IconChevronLeft,
-  IconChevronRight,
 } from "../icons";
 import {
   identifyElement,
@@ -69,7 +47,6 @@ import {
   syncAnnotation,
   updateAnnotation as updateAnnotationOnServer,
   deleteAnnotation as deleteAnnotationFromServer,
-  requestAction,
 } from "../../utils/sync";
 import { getReactComponentName } from "../../utils/react-detection";
 import {
@@ -86,8 +63,9 @@ import {
 
 import type { Annotation } from "../../types";
 import styles from "./styles.module.scss";
-import { Tooltip } from "../tooltip";
-import { HelpTooltip } from "../help-tooltip";
+import { generateOutput } from "../../utils/generate-output";
+import { AnnotationMarker, ExitingMarker, PendingMarker } from "./annotation-marker";
+import { SettingsPanel } from "./settings-panel";
 
 /**
  * Composes element identification with React component detection.
@@ -139,9 +117,9 @@ type HoverInfo = {
   reactComponents?: string | null;
 };
 
-type OutputDetailLevel = "compact" | "standard" | "detailed" | "forensic";
+export type OutputDetailLevel = "compact" | "standard" | "detailed" | "forensic";
 // ReactComponentMode is now derived from outputDetail when reactEnabled is true
-type ReactComponentMode = "smart" | "filtered" | "all" | "off";
+export type ReactComponentMode = "smart" | "filtered" | "all" | "off";
 type MarkerClickBehavior = "edit" | "delete";
 
 type ToolbarSettings = {
@@ -185,22 +163,7 @@ const OUTPUT_TO_REACT_MODE: Record<OutputDetailLevel, ReactComponentMode> = {
   forensic: "all",
 };
 
-const MARKER_CLICK_OPTIONS: {
-  value: MarkerClickBehavior;
-  label: string;
-}[] = [
-  { value: "edit", label: "Edit" },
-  { value: "delete", label: "Delete" },
-];
-
-const OUTPUT_DETAIL_OPTIONS: { value: OutputDetailLevel; label: string }[] = [
-  { value: "compact", label: "Compact" },
-  { value: "standard", label: "Standard" },
-  { value: "detailed", label: "Detailed" },
-  { value: "forensic", label: "Forensic" },
-];
-
-const COLOR_OPTIONS = [
+export const COLOR_OPTIONS = [
   { id: "indigo",  label: "Indigo",  srgb: "#6155F5", p3: "color(display-p3 0.38 0.33 0.96)" },
   { id: "blue",    label: "Blue",    srgb: "#0088FF", p3: "color(display-p3 0.00 0.53 1.00)" },
   { id: "cyan",    label: "Cyan",    srgb: "#00C3D0", p3: "color(display-p3 0.00 0.76 0.82)" },
@@ -277,60 +240,8 @@ function isElementFixed(element: HTMLElement): boolean {
   return false;
 }
 
-function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHr = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHr / 24);
-
-  if (diffSec < 60) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHr < 24) return `${diffHr}h ago`;
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return date.toLocaleDateString();
-}
-
 function isRenderableAnnotation(annotation: Annotation): boolean {
   return annotation.status !== "resolved" && annotation.status !== "dismissed";
-}
-
-function truncateUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    const path = parsed.pathname;
-    // Show path, truncate if too long
-    if (path.length > 25) {
-      return "..." + path.slice(-22);
-    }
-    return path || "/";
-  } catch {
-    // If URL parsing fails, just truncate the string
-    if (url.length > 25) {
-      return "..." + url.slice(-22);
-    }
-    return url;
-  }
-}
-
-function getActiveButtonStyle(
-  isActive: boolean,
-  color: string,
-): React.CSSProperties | undefined {
-  if (!isActive) return undefined;
-  return {
-    color: color,
-    backgroundColor: hexToRgba(color, 0.25),
-  };
 }
 
 function detectSourceFile(element: Element): string | undefined {
@@ -340,121 +251,6 @@ function detectSourceFile(element: Element): string | undefined {
     return formatSourceLocation(loc.source, "path");
   }
   return undefined;
-}
-
-function generateOutput(
-  annotations: Annotation[],
-  pathname: string,
-  detailLevel: OutputDetailLevel = "standard",
-  reactMode: ReactComponentMode = "filtered",
-): string {
-  if (annotations.length === 0) return "";
-
-  const viewport =
-    typeof window !== "undefined"
-      ? `${window.innerWidth}×${window.innerHeight}`
-      : "unknown";
-
-  let output = `## Page Feedback: ${pathname}\n`;
-
-  if (detailLevel === "forensic") {
-    // Full environment info for forensic mode
-    output += `\n**Environment:**\n`;
-    output += `- Viewport: ${viewport}\n`;
-    if (typeof window !== "undefined") {
-      output += `- URL: ${window.location.href}\n`;
-      output += `- User Agent: ${navigator.userAgent}\n`;
-      output += `- Timestamp: ${new Date().toISOString()}\n`;
-      output += `- Device Pixel Ratio: ${window.devicePixelRatio}\n`;
-    }
-    output += `\n---\n`;
-  } else if (detailLevel !== "compact") {
-    output += `**Viewport:** ${viewport}\n`;
-  }
-  output += "\n";
-
-  annotations.forEach((a, i) => {
-    if (detailLevel === "compact") {
-      output += `${i + 1}. **${a.element}**${a.sourceFile ? ` (${a.sourceFile})` : ""}: ${a.comment}`;
-      if (a.selectedText) {
-        output += ` (re: "${a.selectedText.slice(0, 30)}${a.selectedText.length > 30 ? "..." : ""}")`;
-      }
-      output += "\n";
-    } else if (detailLevel === "forensic") {
-      // Forensic mode - order matches output page example
-      output += `### ${i + 1}. ${a.element}\n`;
-      if (a.isMultiSelect && a.fullPath) {
-        output += `*Forensic data shown for first element of selection*\n`;
-      }
-      if (a.fullPath) {
-        output += `**Full DOM Path:** ${a.fullPath}\n`;
-      }
-      if (a.cssClasses) {
-        output += `**CSS Classes:** ${a.cssClasses}\n`;
-      }
-      if (a.boundingBox) {
-        output += `**Position:** x:${Math.round(a.boundingBox.x)}, y:${Math.round(a.boundingBox.y)} (${Math.round(a.boundingBox.width)}×${Math.round(a.boundingBox.height)}px)\n`;
-      }
-      output += `**Annotation at:** ${a.x.toFixed(1)}% from left, ${Math.round(a.y)}px from top\n`;
-      if (a.selectedText) {
-        output += `**Selected text:** "${a.selectedText}"\n`;
-      }
-      if (a.nearbyText && !a.selectedText) {
-        output += `**Context:** ${a.nearbyText.slice(0, 100)}\n`;
-      }
-      if (a.computedStyles) {
-        output += `**Computed Styles:** ${a.computedStyles}\n`;
-      }
-      if (a.accessibility) {
-        output += `**Accessibility:** ${a.accessibility}\n`;
-      }
-      if (a.nearbyElements) {
-        output += `**Nearby Elements:** ${a.nearbyElements}\n`;
-      }
-      if (a.sourceFile) {
-        output += `**Source:** ${a.sourceFile}\n`;
-      }
-      if (a.reactComponents) {
-        output += `**React:** ${a.reactComponents}\n`;
-      }
-      output += `**Feedback:** ${a.comment}\n\n`;
-    } else {
-      // Standard and detailed modes
-      output += `### ${i + 1}. ${a.element}\n`;
-      output += `**Location:** ${a.elementPath}\n`;
-
-      if (a.sourceFile) {
-        output += `**Source:** ${a.sourceFile}\n`;
-      }
-
-      // React components in both standard and detailed
-      if (a.reactComponents) {
-        output += `**React:** ${a.reactComponents}\n`;
-      }
-
-      if (detailLevel === "detailed") {
-        if (a.cssClasses) {
-          output += `**Classes:** ${a.cssClasses}\n`;
-        }
-
-        if (a.boundingBox) {
-          output += `**Position:** ${Math.round(a.boundingBox.x)}px, ${Math.round(a.boundingBox.y)}px (${Math.round(a.boundingBox.width)}×${Math.round(a.boundingBox.height)}px)\n`;
-        }
-      }
-
-      if (a.selectedText) {
-        output += `**Selected text:** "${a.selectedText}"\n`;
-      }
-
-      if (detailLevel === "detailed" && a.nearbyText && !a.selectedText) {
-        output += `**Context:** ${a.nearbyText.slice(0, 100)}\n`;
-      }
-
-      output += `**Feedback:** ${a.comment}\n\n`;
-    }
-  });
-
-  return output.trim();
 }
 
 // =============================================================================
@@ -2603,7 +2399,6 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       annotations,
       displayUrl,
       settings.outputDetail,
-      effectiveReactMode,
     );
     if (!output) return;
 
@@ -2647,7 +2442,6 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       annotations,
       displayUrl,
       settings.outputDetail,
-      effectiveReactMode,
     );
     if (!output) return;
 
@@ -3238,373 +3032,20 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               </span>
             </div>
           </div>
-
-          {/* Settings Panel */}
-          <div
-            className={`${styles.settingsPanel} ${showSettingsVisible ? styles.enter : styles.exit}`}
-            onClick={(e) => e.stopPropagation()}
-            style={
-              toolbarPosition && toolbarPosition.y < 230
-                ? {
-                    bottom: "auto",
-                    top: "calc(100% + 0.5rem)",
-                  }
-                : undefined
-            }
-          >
-            <div
-              className={styles.settingsPanelContainer}
-            >
-              <div
-                className={`${styles.settingsPage} ${settingsPage === "automations" ? styles.slideLeft : ""}`}
-              >
-                <div className={styles.settingsHeader}>
-                  <span className={styles.settingsBrand}>
-                    <span
-                      className={styles.settingsBrandSlash}
-                    >
-                      /
-                    </span>
-                    agentation
-                  </span>
-                  <span className={styles.settingsVersion}>v{__VERSION__}</span>
-                  <button
-                    className={styles.themeToggle}
-                    onClick={toggleTheme}
-                    title={
-                      isDarkMode
-                        ? "Switch to light mode"
-                        : "Switch to dark mode"
-                    }
-                  >
-                    <span className={styles.themeIconWrapper}>
-                      <span
-                        key={isDarkMode ? "sun" : "moon"}
-                        className={styles.themeIcon}
-                      >
-                        {isDarkMode ? (
-                          <IconSun size={20} />
-                        ) : (
-                          <IconMoon size={20} />
-                        )}
-                      </span>
-                    </span>
-                  </button>
-                </div>
-
-                <div className={styles.settingsSection}>
-                  <div className={styles.settingsRow}>
-                    <div
-                      className={styles.settingsLabel}
-                    >
-                      Output Detail
-                      <HelpTooltip content="Controls how much detail is included in the copied output" />
-                    </div>
-                    <button
-                      className={styles.cycleButton}
-                      onClick={() => {
-                        const currentIndex = OUTPUT_DETAIL_OPTIONS.findIndex(
-                          (opt) => opt.value === settings.outputDetail,
-                        );
-                        const nextIndex =
-                          (currentIndex + 1) % OUTPUT_DETAIL_OPTIONS.length;
-                        setSettings((s) => ({
-                          ...s,
-                          outputDetail: OUTPUT_DETAIL_OPTIONS[nextIndex].value,
-                        }));
-                      }}
-                    >
-                      <span
-                        key={settings.outputDetail}
-                        className={styles.cycleButtonText}
-                      >
-                        {
-                          OUTPUT_DETAIL_OPTIONS.find(
-                            (opt) => opt.value === settings.outputDetail,
-                          )?.label
-                        }
-                      </span>
-                      <span className={styles.cycleDots}>
-                        {OUTPUT_DETAIL_OPTIONS.map((option, i) => (
-                          <span
-                            key={option.value}
-                            className={`${styles.cycleDot} ${settings.outputDetail === option.value ? styles.active : ""}`}
-                          />
-                        ))}
-                      </span>
-                    </button>
-                  </div>
-
-                  <div
-                    className={`${styles.settingsRow} ${styles.settingsRowMarginTop} ${!isDevMode ? styles.settingsRowDisabled : ""}`}
-                  >
-                    <div
-                      className={styles.settingsLabel}
-                    >
-                      React Components
-                      <HelpTooltip
-                        content={
-                          !isDevMode
-                            ? "Disabled — production builds minify component names, making detection unreliable. Use in development mode."
-                            : "Include React component names in annotations"
-                        }
-                      />
-                    </div>
-                    <label
-                      className={`${styles.toggleSwitch} ${!isDevMode ? styles.disabled : ""}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isDevMode && settings.reactEnabled}
-                        disabled={!isDevMode}
-                        onChange={() =>
-                          setSettings((s) => ({
-                            ...s,
-                            reactEnabled: !s.reactEnabled,
-                          }))
-                        }
-                      />
-                      <span className={styles.toggleSlider} />
-                    </label>
-                  </div>
-
-                  <div className={`${styles.settingsRow} ${styles.settingsRowMarginTop}`}>
-                    <div
-                      className={styles.settingsLabel}
-                    >
-                      Hide Until Restart
-                      <HelpTooltip content="Hides the toolbar until you open a new tab" />
-                    </div>
-                    <label className={styles.toggleSwitch}>
-                      <input
-                        type="checkbox"
-                        checked={false}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            hideToolbarTemporarily();
-                          }
-                        }}
-                      />
-                      <span className={styles.toggleSlider} />
-                    </label>
-                  </div>
-                </div>
-
-                <div className={styles.settingsSection}>
-                  <div
-                    className={`${styles.settingsLabel} ${styles.settingsLabelMarker}`}
-                  >
-                    Marker Color
-                  </div>
-                  <div className={styles.colorOptions}>
-                   {COLOR_OPTIONS.map((color) => (
-                      <div
-                        key={color.id}
-                        role="button"
-                        onClick={() => setSettings((s) => ({ ...s, annotationColorId: color.id }))}
-                        style={{
-                          "--swatch": color.srgb,
-                          "--swatch-p3": color.p3,
-                        } as React.CSSProperties}
-                        className={`${styles.colorOptionRing} ${settings.annotationColorId === color.id ? styles.selected : ""}`}
-                      >
-                        <div
-                          className={`${styles.colorOption} ${settings.annotationColorId === color.id ? styles.selected : ""}`}
-                          title={color.label}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className={styles.settingsSection}>
-                  <label className={styles.settingsToggle}>
-                    <input
-                      type="checkbox"
-                      id="autoClearAfterCopy"
-                      checked={settings.autoClearAfterCopy}
-                      onChange={(e) =>
-                        setSettings((s) => ({
-                          ...s,
-                          autoClearAfterCopy: e.target.checked,
-                        }))
-                      }
-                    />
-                    <label
-                      className={`${styles.customCheckbox} ${settings.autoClearAfterCopy ? styles.checked : ""}`}
-                      htmlFor="autoClearAfterCopy"
-                    >
-                      {settings.autoClearAfterCopy && (
-                        <IconCheckSmallAnimated size={14} />
-                      )}
-                    </label>
-                    <span
-                      className={styles.toggleLabel}
-                    >
-                      Clear on copy/send
-                      <HelpTooltip content="Automatically clear annotations after copying" />
-                    </span>
-                  </label>
-                  <label
-                    className={`${styles.settingsToggle} ${styles.settingsToggleMarginBottom}`}
-                  >
-                    <input
-                      type="checkbox"
-                      id="blockInteractions"
-                      checked={settings.blockInteractions}
-                      onChange={(e) =>
-                        setSettings((s) => ({
-                          ...s,
-                          blockInteractions: e.target.checked,
-                        }))
-                      }
-                    />
-                    <label
-                      className={`${styles.customCheckbox} ${settings.blockInteractions ? styles.checked : ""}`}
-                      htmlFor="blockInteractions"
-                    >
-                      {settings.blockInteractions && (
-                        <IconCheckSmallAnimated size={14} />
-                      )}
-                    </label>
-                    <span
-                      className={styles.toggleLabel}
-                    >
-                      Block page interactions
-                    </span>
-                  </label>
-                </div>
-
-                <div
-                  className={`${styles.settingsSection} ${styles.settingsSectionExtraPadding}`}
-                >
-                  <button
-                    className={styles.settingsNavLink}
-                    onClick={() => setSettingsPage("automations")}
-                  >
-                    <span>Manage MCP & Webhooks</span>
-                    <span className={styles.settingsNavLinkRight}>
-                      {endpoint && connectionStatus !== "disconnected" && (
-                        <span
-                          className={`${styles.mcpNavIndicator} ${styles[connectionStatus]}`}
-                        />
-                      )}
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M7.5 12.5L12 8L7.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Automations Page */}
-              <div
-                className={`${styles.settingsPage} ${styles.automationsPage} ${settingsPage === "automations" ? styles.slideIn : ""}`}
-              >
-                <button
-                  className={styles.settingsBackButton}
-                  onClick={() => setSettingsPage("main")}
-                >
-                  <IconChevronLeft size={16} />
-                  <span>Manage MCP & Webhooks</span>
-                </button>
-
-                {/* MCP Connection section */}
-                <div className={styles.settingsSection}>
-                  <div className={styles.settingsRow}>
-                    <span
-                      className={styles.automationHeader}
-                    >
-                      MCP Connection
-                      <HelpTooltip content="Connect via Model Context Protocol to let AI agents like Claude Code receive annotations in real-time." />
-                    </span>
-                    {endpoint && (
-                      <div
-                        className={`${styles.mcpStatusDot} ${styles[connectionStatus]}`}
-                        title={
-                          connectionStatus === "connected"
-                            ? "Connected"
-                            : connectionStatus === "connecting"
-                              ? "Connecting..."
-                              : "Disconnected"
-                        }
-                      />
-                    )}
-                  </div>
-                  <p
-                    className={styles.automationDescription}
-                    style={{ paddingBottom: 6 }}
-                  >
-                    MCP connection allows agents to receive and act on
-                    annotations.{" "}
-                    <a
-                      href="https://agentation.dev/mcp"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.learnMoreLink}
-                    >
-                      Learn more
-                    </a>
-                  </p>
-                </div>
-
-                {/* Webhooks section */}
-                <div
-                  className={`${styles.settingsSection} ${styles.settingsSectionGrow}`}
-                >
-                  <div className={styles.settingsRow}>
-                    <span
-                      className={styles.automationHeader}
-                    >
-                      Webhooks
-                      <HelpTooltip content="Send annotation data to any URL endpoint when annotations change. Useful for custom integrations." />
-                    </span>
-                    <div className={styles.autoSendRow}>
-                      <span
-                        className={`${styles.autoSendLabel} ${settings.webhooksEnabled ? styles.active : ""}`}
-                      >
-                        Auto-Send
-                      </span>
-                      <label
-                        className={`${styles.toggleSwitch} ${!settings.webhookUrl ? styles.disabled : ""}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={settings.webhooksEnabled}
-                          disabled={!settings.webhookUrl}
-                          onChange={() =>
-                            setSettings((s) => ({
-                              ...s,
-                              webhooksEnabled: !s.webhooksEnabled,
-                            }))
-                          }
-                        />
-                        <span className={styles.toggleSlider} />
-                      </label>
-                    </div>
-                  </div>
-                  <p
-                    className={styles.automationDescription}
-                  >
-                    The webhook URL will receive live annotation changes and
-                    annotation data.
-                  </p>
-                  <textarea
-                    className={styles.webhookUrlInput}
-                    placeholder="Webhook URL"
-                    value={settings.webhookUrl}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        webhookUrl: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+          <SettingsPanel
+            settings={settings}
+            onSettingsChange={(patch) => setSettings((s) => ({ ...s, ...patch }))}
+            isDarkMode={isDarkMode}
+            onToggleTheme={toggleTheme}
+            isDevMode={isDevMode}
+            connectionStatus={connectionStatus}
+            endpoint={endpoint}
+            isVisible={showSettingsVisible}
+            toolbarNearBottom={!!toolbarPosition && toolbarPosition.y < 230}
+            settingsPage={settingsPage}
+            onSettingsPageChange={setSettingsPage}
+            onHideToolbar={hideToolbarTemporarily}
+          />
         </div>
       </div>
 
@@ -3613,124 +3054,41 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         {markersVisible &&
           visibleAnnotations
             .filter((a) => !a.isFixed)
-            .map((annotation, index) => {
-              const isHovered =
-                !markersExiting && hoveredMarkerId === annotation.id;
-              const isDeleting = deletingMarkerId === annotation.id;
-              const showDeleteState =
-                (isHovered || isDeleting) && !editingAnnotation;
-              const isMulti = annotation.isMultiSelect;
-              const markerColor = isMulti
-                ? "var(--agentation-color-green)"
-                : "var(--agentation-color-accent)";
-              const globalIndex = annotations.findIndex(
-                (a) => a.id === annotation.id,
-              );
-              const needsEnterAnimation = !animatedMarkers.has(annotation.id);
-              const animClass = markersExiting
-                ? styles.exit
-                : isClearing
-                  ? styles.clearing
-                  : needsEnterAnimation
-                    ? styles.enter
-                    : "";
-
-              const showDeleteHover =
-                showDeleteState && settings.markerClickBehavior === "delete";
-              return (
-                <div
-                  key={annotation.id}
-                  className={`${styles.marker} ${isMulti ? styles.multiSelect : ""} ${animClass} ${showDeleteHover ? styles.hovered : ""}`}
-                  data-annotation-marker
-                  style={{
-                    left: `${annotation.x}%`,
-                    top: annotation.y,
-                    backgroundColor: showDeleteHover ? undefined : markerColor,
-                    animationDelay: markersExiting
-                      ? `${(visibleAnnotations.length - 1 - index) * 20}ms`
-                      : `${index * 20}ms`,
-                  }}
-                  onMouseEnter={() =>
-                    !markersExiting &&
-                    annotation.id !== recentlyAddedIdRef.current &&
-                    handleMarkerHover(annotation)
-                  }
-                  onMouseLeave={() => handleMarkerHover(null)}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!markersExiting) {
-                      if (settings.markerClickBehavior === "delete") {
-                        deleteAnnotation(annotation.id);
-                      } else {
-                        startEditAnnotation(annotation);
-                      }
-                    }
-                  }}
-                  onContextMenu={(e) => {
-                    if (settings.markerClickBehavior === "delete") {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (!markersExiting) startEditAnnotation(annotation);
-                    }
-                  }}
-                >
-                  {showDeleteState ? (
-                    showDeleteHover ? (
-                      <IconXmark size={isMulti ? 18 : 16} />
-                    ) : (
-                      <IconEdit size={16} />
-                    )
-                  ) : (
-                    <span
-                      className={
-                        renumberFrom !== null && globalIndex >= renumberFrom
-                          ? styles.renumber
-                          : undefined
-                      }
-                    >
-                      {globalIndex + 1}
-                    </span>
-                  )}
-                  {isHovered && !editingAnnotation && (
-                    <div
-                      className={`${styles.markerTooltip} ${styles.enter}`}
-                      style={getTooltipPosition(annotation)}
-                    >
-                      <span className={styles.markerQuote}>
-                        {annotation.element}
-                        {annotation.selectedText &&
-                          ` "${annotation.selectedText.slice(0, 30)}${annotation.selectedText.length > 30 ? "..." : ""}"`}
-                      </span>
-                      <span className={styles.markerNote}>
-                        {annotation.comment}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-        {/* Exiting markers (normal) - individual deletion animations */}
+            .map((annotation, layerIndex, arr) => (
+              <AnnotationMarker
+                key={annotation.id}
+                annotation={annotation}
+                globalIndex={annotations.findIndex((a) => a.id === annotation.id)}
+                layerIndex={layerIndex}
+                layerSize={arr.length}
+                isExiting={markersExiting}
+                isClearing={isClearing}
+                isAnimated={animatedMarkers.has(annotation.id)}
+                isHovered={!markersExiting && hoveredMarkerId === annotation.id}
+                isDeleting={deletingMarkerId === annotation.id}
+                isEditingAny={!!editingAnnotation}
+                renumberFrom={renumberFrom}
+                markerClickBehavior={settings.markerClickBehavior}
+                tooltipStyle={getTooltipPosition(annotation)}
+                onHoverEnter={(a) =>
+                  !markersExiting &&
+                  a.id !== recentlyAddedIdRef.current &&
+                  handleMarkerHover(a)
+                }
+                onHoverLeave={() => handleMarkerHover(null)}
+                onClick={(a) =>
+                  settings.markerClickBehavior === "delete"
+                    ? deleteAnnotation(a.id)
+                    : startEditAnnotation(a)
+                }
+                onContextMenu={startEditAnnotation}
+              />
+            ))}
         {markersVisible &&
           !markersExiting &&
           exitingAnnotationsList
             .filter((a) => !a.isFixed)
-            .map((annotation) => {
-              const isMulti = annotation.isMultiSelect;
-              return (
-                <div
-                  key={annotation.id}
-                  className={`${styles.marker} ${styles.hovered} ${isMulti ? styles.multiSelect : ""} ${styles.exit}`}
-                  data-annotation-marker
-                  style={{
-                    left: `${annotation.x}%`,
-                    top: annotation.y,
-                  }}
-                >
-                  <IconXmark size={isMulti ? 12 : 10} />
-                </div>
-              );
-            })}
+            .map((a) => <ExitingMarker key={a.id} annotation={a} />)}
       </div>
 
       {/* Fixed markers layer */}
@@ -3738,128 +3096,43 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         {markersVisible &&
           visibleAnnotations
             .filter((a) => a.isFixed)
-            .map((annotation, index) => {
-              const fixedAnnotations = visibleAnnotations.filter(
-                (a) => a.isFixed,
-              );
-              const isHovered =
-                !markersExiting && hoveredMarkerId === annotation.id;
-              const isDeleting = deletingMarkerId === annotation.id;
-              const showDeleteState =
-                (isHovered || isDeleting) && !editingAnnotation;
-              const isMulti = annotation.isMultiSelect;
-              const markerColor = isMulti
-                ? "var(--agentation-color-green)"
-                : "var(--agentation-color-accent)";
-              const globalIndex = annotations.findIndex(
-                (a) => a.id === annotation.id,
-              );
-              const needsEnterAnimation = !animatedMarkers.has(annotation.id);
-              const animClass = markersExiting
-                ? styles.exit
-                : isClearing
-                  ? styles.clearing
-                  : needsEnterAnimation
-                    ? styles.enter
-                    : "";
-
-              const showDeleteHover =
-                showDeleteState && settings.markerClickBehavior === "delete";
-              return (
-                <div
-                  key={annotation.id}
-                  className={`${styles.marker} ${styles.fixed} ${isMulti ? styles.multiSelect : ""} ${animClass} ${showDeleteHover ? styles.hovered : ""}`}
-                  data-annotation-marker
-                  style={{
-                    left: `${annotation.x}%`,
-                    top: annotation.y,
-                    backgroundColor: showDeleteHover ? undefined : markerColor,
-                    animationDelay: markersExiting
-                      ? `${(fixedAnnotations.length - 1 - index) * 20}ms`
-                      : `${index * 20}ms`,
-                  }}
-                  onMouseEnter={() =>
-                    !markersExiting &&
-                    annotation.id !== recentlyAddedIdRef.current &&
-                    handleMarkerHover(annotation)
-                  }
-                  onMouseLeave={() => handleMarkerHover(null)}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!markersExiting) {
-                      if (settings.markerClickBehavior === "delete") {
-                        deleteAnnotation(annotation.id);
-                      } else {
-                        startEditAnnotation(annotation);
-                      }
-                    }
-                  }}
-                  onContextMenu={(e) => {
-                    if (settings.markerClickBehavior === "delete") {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (!markersExiting) startEditAnnotation(annotation);
-                    }
-                  }}
-                >
-                  {showDeleteState ? (
-                    showDeleteHover ? (
-                      <IconXmark size={isMulti ? 18 : 16} />
-                    ) : (
-                      <IconEdit size={16} />
-                    )
-                  ) : (
-                    <span
-                      className={
-                        renumberFrom !== null && globalIndex >= renumberFrom
-                          ? styles.renumber
-                          : undefined
-                      }
-                    >
-                      {globalIndex + 1}
-                    </span>
-                  )}
-                  {isHovered && !editingAnnotation && (
-                    <div
-                      className={`${styles.markerTooltip} ${styles.enter}`}
-                      style={getTooltipPosition(annotation)}
-                    >
-                      <span className={styles.markerQuote}>
-                        {annotation.element}
-                        {annotation.selectedText &&
-                          ` "${annotation.selectedText.slice(0, 30)}${annotation.selectedText.length > 30 ? "..." : ""}"`}
-                      </span>
-                      <span className={styles.markerNote}>
-                        {annotation.comment}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-        {/* Exiting markers (fixed) - individual deletion animations */}
+            .map((annotation, layerIndex, arr) => (
+              <AnnotationMarker
+                key={annotation.id}
+                annotation={annotation}
+                globalIndex={annotations.findIndex((a) => a.id === annotation.id)}
+                layerIndex={layerIndex}
+                layerSize={arr.length}
+                isExiting={markersExiting}
+                isClearing={isClearing}
+                isAnimated={animatedMarkers.has(annotation.id)}
+                isHovered={!markersExiting && hoveredMarkerId === annotation.id}
+                isDeleting={deletingMarkerId === annotation.id}
+                isEditingAny={!!editingAnnotation}
+                renumberFrom={renumberFrom}
+                markerClickBehavior={settings.markerClickBehavior}
+                tooltipStyle={getTooltipPosition(annotation)}
+                onHoverEnter={(a) =>
+                  !markersExiting &&
+                  a.id !== recentlyAddedIdRef.current &&
+                  handleMarkerHover(a)
+                }
+                onHoverLeave={() => handleMarkerHover(null)}
+                onClick={(a) =>
+                  settings.markerClickBehavior === "delete"
+                    ? deleteAnnotation(a.id)
+                    : startEditAnnotation(a)
+                }
+                onContextMenu={startEditAnnotation}
+              />
+            ))}
         {markersVisible &&
           !markersExiting &&
           exitingAnnotationsList
             .filter((a) => a.isFixed)
-            .map((annotation) => {
-              const isMulti = annotation.isMultiSelect;
-              return (
-                <div
-                  key={annotation.id}
-                  className={`${styles.marker} ${styles.fixed} ${styles.hovered} ${isMulti ? styles.multiSelect : ""} ${styles.exit}`}
-                  data-annotation-marker
-                  style={{
-                    left: `${annotation.x}%`,
-                    top: annotation.y,
-                  }}
-                >
-                  <IconClose size={isMulti ? 12 : 10} />
-                </div>
-              );
-            })}
+            .map((a) => <ExitingMarker key={a.id} annotation={a} fixed />)}
       </div>
+
 
       {/* Interactive overlay */}
       {isActive && (
@@ -4105,18 +3378,12 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
                 return (
                   <>
-                    <div
-                      className={`${styles.marker} ${styles.pending} ${pendingAnnotation.isMultiSelect ? styles.multiSelect : ""} ${pendingExiting ? styles.exit : styles.enter}`}
-                      style={{
-                        left: `${markerX}%`,
-                        top: markerY,
-                        backgroundColor: pendingAnnotation.isMultiSelect
-                          ? "var(--agentation-color-green)"
-                          : "var(--agentation-color-accent)",
-                      }}
-                    >
-                      <IconPlus size={12} />
-                    </div>
+                    <PendingMarker
+                      x={markerX}
+                      y={markerY}
+                      isMultiSelect={pendingAnnotation.isMultiSelect}
+                      isExiting={pendingExiting}
+                    />
 
                     <AnnotationPopupCSS
                       ref={popupRef}
