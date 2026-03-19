@@ -147,7 +147,6 @@ button {
   -webkit-tap-highlight-color: transparent;
 
   &:disabled {
-    pointer-events: none;
     cursor: not-allowed;
   }
 }

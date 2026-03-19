@@ -517,7 +517,6 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     toolbarX: number;
     toolbarY: number;
   } | null>(null);
-  const [dragRotation, setDragRotation] = useState(0);
   const justFinishedToolbarDragRef = useRef(false);
 
   // For animations - track which markers have animated in and which are exiting
@@ -1276,45 +1275,28 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
   useEffect(() => {
     if (!isActive) return;
 
+    const textElementsSelector = [
+      "p", "span", "h1", "h2", "h3", "h4", "h5", "h6",
+      "li", "td", "th", "label", "blockquote", "figcaption",
+      "caption", "legend", "dt", "dd", "pre", "code",
+      "em", "strong", "b", "i", "u", "s", "a",
+      "time", "address", "cite", "q", "abbr", "dfn",
+      "mark", "small", "sub", "sup", "[contenteditable]"
+    ].join(", ");
+
+    const notAgentationSelector = `:not([data-agentation-root]):not([data-agentation-root] *)`;
+
     const style = document.createElement("style");
     style.id = "feedback-cursor-styles";
     // Text elements get text cursor (higher specificity with body prefix)
     // Everything else gets crosshair
     style.textContent = `
-      body * {
+      body ${notAgentationSelector} {
         cursor: crosshair !important;
       }
-      body p, body span, body h1, body h2, body h3, body h4, body h5, body h6,
-      body li, body td, body th, body label, body blockquote, body figcaption,
-      body caption, body legend, body dt, body dd, body pre, body code,
-      body em, body strong, body b, body i, body u, body s, body a,
-      body time, body address, body cite, body q, body abbr, body dfn,
-      body mark, body small, body sub, body sup, body [contenteditable],
-      body p *, body span *, body h1 *, body h2 *, body h3 *, body h4 *,
-      body h5 *, body h6 *, body li *, body a *, body label *, body pre *,
-      body code *, body blockquote *, body [contenteditable] * {
+
+      body :is(${textElementsSelector})${notAgentationSelector} {
         cursor: text !important;
-      }
-      [data-feedback-toolbar], [data-feedback-toolbar] * {
-        cursor: auto !important;
-      }
-      [data-feedback-toolbar] textarea,
-      [data-feedback-toolbar] input[type="text"],
-      [data-feedback-toolbar] input[type="url"] {
-        cursor: text !important;
-      }
-      [data-feedback-toolbar] button,
-      [data-feedback-toolbar] button *,
-      [data-feedback-toolbar] label,
-      [data-feedback-toolbar] label *,
-      [data-feedback-toolbar] a,
-      [data-feedback-toolbar] a *,
-      [data-feedback-toolbar] [role="button"],
-      [data-feedback-toolbar] [role="button"] * {
-        cursor: pointer !important;
-      }
-      [data-annotation-marker], [data-annotation-marker] * {
-        cursor: pointer !important;
       }
     `;
     document.head.appendChild(style);
@@ -2569,10 +2551,6 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       const currentX = toolbarPosition?.x ?? rect.left;
       const currentY = toolbarPosition?.y ?? rect.top;
 
-      // Generate random rotation between -5 and 5 degrees
-      const randomRotation = (Math.random() - 0.5) * 10; // -5 to +5
-      setDragRotation(randomRotation);
-
       setDragStartPos({
         x: e.clientX,
         y: e.clientY,
@@ -2792,7 +2770,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
   };
 
   return createPortal(
-    <div ref={portalWrapperRef} style={{ display: "contents" }} data-agentation-theme={isDarkMode ? "dark" : "light"} data-agentation-accent={settings.annotationColorId}>
+    <div ref={portalWrapperRef} style={{ display: "contents" }} data-agentation-theme={isDarkMode ? "dark" : "light"} data-agentation-accent={settings.annotationColorId} data-agentation-root="">
       {/* Toolbar */}
       <div
         className={`${styles.toolbar}${userClassName ? ` ${userClassName}` : ""}`}
@@ -2810,7 +2788,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       >
         {/* Morphing container */}
         <div
-          className={`${styles.toolbarContainer} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${isDraggingToolbar ? styles.dragging : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
+          className={`${styles.toolbarContainer} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
           onClick={
             !isActive
               ? (e) => {
@@ -2828,12 +2806,6 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
           role={!isActive ? "button" : undefined}
           tabIndex={!isActive ? 0 : -1}
           title={!isActive ? "Start feedback mode" : undefined}
-          style={{
-            ...(isDraggingToolbar && {
-              transform: `scale(1.05) rotate(${dragRotation}deg)`,
-              cursor: "grabbing",
-            }),
-          }}
         >
           {/* Toggle content - visible when collapsed */}
           <div
