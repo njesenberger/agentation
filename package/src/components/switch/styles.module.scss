@@ -31,6 +31,10 @@
   border-radius: inherit;
   opacity: 0;
   cursor: pointer;
+
+  &:disabled {
+    cursor: not-allowed;
+  }
 }
 
 .switchThumb {

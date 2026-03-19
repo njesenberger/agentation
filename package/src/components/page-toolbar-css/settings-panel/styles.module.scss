@@ -114,8 +114,6 @@
   .cycleButton,
   .cycleDot,
   .dropdownButton,
-  .toggleLabel,
-  .customCheckbox,
   .sliderLabel,
   .slider,
   .themeToggle {
@@ -167,10 +165,6 @@
         background: rgba(255, 255, 255, 0.15);
         color: #fff;
       }
-    }
-
-    .toggleLabel {
-      color: rgba(255, 255, 255, 0.85);
     }
   }
 }
@@ -347,11 +341,6 @@
       color: rgba(0, 0, 0, 0.2);
     }
   }
-
-  .toggleSwitch {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
 }
 
 .settingsLabel {
@@ -483,75 +472,6 @@
     @supports (color: color(display-p3 0 0 0)) {
       border-color: var(--swatch-p3);
     }
-  }
-}
-
-// =============================================================================
-// Checkboxes & toggles
-// =============================================================================
-
-.checkboxField {
-  &:not(:first-child) {
-    margin-top: 8px;
-  }
-}
-
-.toggleSwitch {
-  position: relative;
-  display: inline-block;
-  width: 24px;
-  height: 16px;
-  flex-shrink: 0;
-  cursor: pointer;
-  transition:
-    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-
-  input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-
-  input:checked + .toggleSlider {
-    background-color: var(--agentation-color-blue);
-  }
-
-  input:checked + .toggleSlider::before {
-    transform: translateX(8px);
-  }
-
-  &.disabled {
-    opacity: 0.4;
-    pointer-events: none;
-
-    .toggleSlider {
-      cursor: not-allowed;
-    }
-  }
-}
-
-.toggleSlider {
-  position: absolute;
-  cursor: pointer;
-  inset: 0;
-  border-radius: 16px;
-  background: #484848;
-
-  [data-agentation-theme="light"] & {
-    background: #dddddd;
-  }
-
-  &::before {
-    content: "";
-    position: absolute;
-    height: 12px;
-    width: 12px;
-    left: 2px;
-    bottom: 2px;
-    background: white;
-    border-radius: 50%;
-    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 
@@ -867,24 +787,6 @@
 
       &:hover {
         background: rgba(0, 0, 0, 0.05);
-      }
-    }
-
-    .toggleLabel {
-      color: rgba(0, 0, 0, 0.5);
-    }
-
-    .customCheckbox {
-      border: 1px solid rgba(0, 0, 0, 0.15);
-      background: #fff;
-
-      &.checked {
-        border-color: #1a1a1a;
-        background: #1a1a1a;
-
-        svg {
-          color: #fff;
-        }
       }
     }
   }
