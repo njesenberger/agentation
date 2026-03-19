@@ -1,12 +1,9 @@
 import { COLOR_OPTIONS, type OutputDetailLevel } from "..";
 import { OUTPUT_DETAIL_OPTIONS } from "../../../utils/generate-output";
 import { HelpTooltip } from "../../help-tooltip";
-import {
-  IconCheckSmallAnimated,
-  IconChevronLeft,
-  IconMoon,
-  IconSun,
-} from "../../icons";
+import { IconChevronLeft, IconMoon, IconSun } from "../../icons";
+import { Switch } from "../../switch";
+import { CheckboxField } from "./checkbox-field";
 import styles from "./styles.module.scss";
 
 type MarkerClickBehavior = "edit" | "delete";
@@ -155,19 +152,13 @@ export function SettingsPanel({
                   }
                 />
               </div>
-              <label
-                className={`${styles.toggleSwitch} ${!isDevMode ? styles.disabled : ""}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isDevMode && settings.reactEnabled}
-                  disabled={!isDevMode}
-                  onChange={() =>
-                    onSettingsChange({ reactEnabled: !settings.reactEnabled })
-                  }
-                />
-                <span className={styles.toggleSlider} />
-              </label>
+              <Switch
+                checked={isDevMode && settings.reactEnabled}
+                onChange={(e) =>
+                  onSettingsChange({ reactEnabled: e.target.checked })
+                }
+                disabled={!isDevMode}
+              />
             </div>
 
             <div
@@ -177,16 +168,13 @@ export function SettingsPanel({
                 Hide Until Restart
                 <HelpTooltip content="Hides the toolbar until you open a new tab" />
               </div>
-              <label className={styles.toggleSwitch}>
-                <input
-                  type="checkbox"
-                  checked={false}
-                  onChange={(e) => {
-                    if (e.target.checked) onHideToolbar();
-                  }}
-                />
-                <span className={styles.toggleSlider} />
-              </label>
+              <Switch
+                checked={false}
+                onChange={(e) => {
+                  if (e.target.checked) onHideToolbar();
+                }}
+                disabled={!isDevMode}
+              />
             </div>
           </div>
 
@@ -224,51 +212,23 @@ export function SettingsPanel({
 
           {/* Checkboxes */}
           <div className={styles.settingsSection}>
-            <label className={styles.settingsToggle}>
-              <input
-                type="checkbox"
-                id="autoClearAfterCopy"
-                checked={settings.autoClearAfterCopy}
-                onChange={(e) =>
-                  onSettingsChange({ autoClearAfterCopy: e.target.checked })
-                }
-              />
-              <label
-                className={`${styles.customCheckbox} ${settings.autoClearAfterCopy ? styles.checked : ""}`}
-                htmlFor="autoClearAfterCopy"
-              >
-                {settings.autoClearAfterCopy && (
-                  <IconCheckSmallAnimated size={14} />
-                )}
-              </label>
-              <span className={styles.toggleLabel}>
-                Clear on copy/send
-                <HelpTooltip content="Automatically clear annotations after copying" />
-              </span>
-            </label>
-            <label
-              className={`${styles.settingsToggle} ${styles.settingsToggleMarginBottom}`}
-            >
-              <input
-                type="checkbox"
-                id="blockInteractions"
-                checked={settings.blockInteractions}
-                onChange={(e) =>
-                  onSettingsChange({ blockInteractions: e.target.checked })
-                }
-              />
-              <label
-                className={`${styles.customCheckbox} ${settings.blockInteractions ? styles.checked : ""}`}
-                htmlFor="blockInteractions"
-              >
-                {settings.blockInteractions && (
-                  <IconCheckSmallAnimated size={14} />
-                )}
-              </label>
-              <span className={styles.toggleLabel}>
-                Block page interactions
-              </span>
-            </label>
+            <CheckboxField
+              className="checkbox-field"
+              label="Clear on copy/send"
+              checked={settings.autoClearAfterCopy}
+              onChange={(e) =>
+                onSettingsChange({ autoClearAfterCopy: e.target.checked })
+              }
+              tooltip="Automatically clear annotations after copying"
+            />
+            <CheckboxField
+              className={styles.checkboxField}
+              label="Block page interactions"
+              checked={settings.blockInteractions}
+              onChange={(e) =>
+                onSettingsChange({ blockInteractions: e.target.checked })
+              }
+            />
           </div>
 
           {/* Nav to automations */}
@@ -363,27 +323,23 @@ export function SettingsPanel({
                 Webhooks
                 <HelpTooltip content="Send annotation data to any URL endpoint when annotations change. Useful for custom integrations." />
               </span>
-              <div className={styles.autoSendRow}>
-                <span
+              <div className={styles.autoSendContainer}>
+                <label
+                  htmlFor="agentation-auto-send"
                   className={`${styles.autoSendLabel} ${settings.webhooksEnabled ? styles.active : ""}`}
                 >
                   Auto-Send
-                </span>
-                <label
-                  className={`${styles.toggleSwitch} ${!settings.webhookUrl ? styles.disabled : ""}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={settings.webhooksEnabled}
-                    disabled={!settings.webhookUrl}
-                    onChange={() =>
-                      onSettingsChange({
-                        webhooksEnabled: !settings.webhooksEnabled,
-                      })
-                    }
-                  />
-                  <span className={styles.toggleSlider} />
                 </label>
+                <Switch
+                  id="agentation-auto-send"
+                  checked={settings.webhooksEnabled}
+                  onChange={(e) =>
+                    onSettingsChange({
+                      webhooksEnabled: e.target.checked,
+                    })
+                  }
+                  disabled={!settings.webhookUrl}
+                />
               </div>
             </div>
             <p className={styles.automationDescription}>

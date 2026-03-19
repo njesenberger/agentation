@@ -490,80 +490,9 @@
 // Checkboxes & toggles
 // =============================================================================
 
-.settingsToggle {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-
-  & + & {
-    margin-top: calc(0.5rem + 6px);
-  }
-
-  input[type="checkbox"] {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-
-  &.settingsToggleMarginBottom {
-    margin-bottom: calc(0.5rem + 6px);
-  }
-}
-
-.customCheckbox {
-  position: relative;
-  width: 14px;
-  height: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.05);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition:
-    background-color 0.25s ease,
-    border-color 0.25s ease;
-
-  svg {
-    color: #1a1a1a;
-    opacity: 1;
-    transition: opacity 0.15s ease;
-  }
-
-  input[type="checkbox"]:checked + & {
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(255, 255, 255, 1);
-  }
-
-  [data-agentation-theme="light"] & {
-    border: 1px solid rgba(0, 0, 0, 0.15);
-    background: #fff;
-
-    &.checked {
-      border-color: #1a1a1a;
-      background: #1a1a1a;
-
-      svg {
-        color: #fff;
-      }
-    }
-  }
-}
-
-.toggleLabel {
-  font-size: 0.8125rem;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.5);
-  letter-spacing: -0.0094em;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-
-  [data-agentation-theme="light"] & {
-    color: rgba(0, 0, 0, 0.5);
+.checkboxField {
+  &:not(:first-child) {
+    margin-top: 8px;
   }
 }
 
@@ -768,16 +697,16 @@
   }
 }
 
-.autoSendRow {
+.autoSendContainer {
   display: flex;
   align-items: center;
-  gap: 8px;
 }
 
 .autoSendLabel {
-  font-size: 0.6875rem;
+  padding-inline-end: 8px;
+  font-size: 11px;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgb(255 255 255 / 0.2);
   transition: color 0.15s ease;
 
   &.active {
@@ -786,7 +715,7 @@
   }
 
   [data-agentation-theme="light"] & {
-    color: rgba(0, 0, 0, 0.4);
+    color: rgba(0 0 0 / 0.4);
 
     &.active {
       color: var(--agentation-color-blue);
