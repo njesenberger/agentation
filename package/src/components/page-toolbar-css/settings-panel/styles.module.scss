@@ -67,13 +67,16 @@
 
 .settingsPanel {
   position: absolute;
-  right: 5px;
+  right: 50%;
+  transform: translateX(50%);
   bottom: calc(100% + 0.5rem);
   z-index: 1;
   overflow: hidden;
   background: #1c1c1c;
-  border-radius: 1rem;
-  padding: 13px 0 16px;
+  border-radius: 16px;
+  padding: 12px 0;
+  width: 100%;
+  max-width: 253px;
   min-width: 205px;
   cursor: default;
   opacity: 1;
@@ -125,7 +128,7 @@
 
   &.enter {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateX(50%) translateY(0) scale(1);
     filter: blur(0px);
     transition:
       opacity 0.2s ease,
@@ -135,7 +138,7 @@
 
   &.exit {
     opacity: 0;
-    transform: translateY(8px) scale(0.95);
+    transform: translateX(50%) translateY(8px) scale(0.95);
     filter: blur(5px);
     pointer-events: none;
     transition:
@@ -173,7 +176,7 @@
   overflow: visible;
   position: relative;
   display: flex;
-  padding: 0 1rem;
+  padding: 0 16px;
 }
 
 // =============================================================================
@@ -202,7 +205,7 @@
   left: 24px;
   width: 100%;
   height: 100%;
-  padding: 3px 1rem 0;
+  padding: 0 16px 4px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -227,10 +230,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 24px;
-  margin-bottom: 0.5rem;
-  padding-bottom: 9px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  height: 24px;
 }
 
 .settingsBrand {
@@ -259,15 +259,15 @@
   justify-content: center;
   width: 22px;
   height: 22px;
-  margin-left: 0.5rem;
+  margin-left: 8px;
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.4);
-  cursor: pointer;
+  color: rgb(255 255 255 / 0.4);
   transition:
     background-color 0.15s ease,
     color 0.15s ease;
+  cursor: pointer;
 
   &:hover {
     background: rgba(255, 255, 255, 0.1);
@@ -304,18 +304,6 @@
 // Sections & rows
 // =============================================================================
 
-.settingsSection {
-  & + & {
-    margin-top: 0.5rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
-  }
-
-  &.settingsSectionExtraPadding {
-    padding-top: calc(0.5rem + 4px);
-  }
-}
-
 .settingsSectionGrow {
   flex: 1;
   display: flex;
@@ -344,22 +332,18 @@
 }
 
 .settingsLabel {
-  font-size: 0.8125rem;
-  font-weight: 400;
-  letter-spacing: -0.0094em;
-  color: rgba(255, 255, 255, 0.5);
   display: flex;
   align-items: center;
-  gap: 0.125rem;
+  column-gap: 2px;
+  line-height: 20px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: -0.15px;
+  color: rgb(255 255 255 / 0.5);
 
   [data-agentation-theme="light"] & {
-    color: rgba(0, 0, 0, 0.5);
+    color: rgb(0 0 0 / 0.5);
   }
-}
-
-.settingsLabelMarker {
-  padding-top: 3px;
-  margin-bottom: 10px;
 }
 
 // =============================================================================
@@ -430,47 +414,53 @@
 
 .colorOptions {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.375rem;
-  margin-bottom: 1px;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  height: 26px;
 }
 
 .colorOption {
-  display: block;
+  position: relative;
+  border-radius: 50%;
   width: 20px;
   height: 20px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  background-color: var(--swatch);
+  background-color: #fff;
   cursor: pointer;
-  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
 
-  @supports (color: color(display-p3 0 0 0)) {
-    background-color: var(--swatch-p3);
+  [data-agentation-theme="dark"] & {
+    background-color: #1a1a1a;
   }
 
-  &:hover {
-    transform: scale(1.15);
-  }
-
-  &.selected {
-    transform: scale(0.83);
-  }
-}
-
-.colorOptionRing {
-  display: flex;
-  width: 24px;
-  height: 24px;
-  border: 2px solid transparent;
-  border-radius: 50%;
-  transition: border-color 0.3s ease;
-
-  &.selected {
-    border-color: var(--swatch);
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background-color: var(--swatch);
+    transition:
+      opacity 0.2s,
+      transform 0.2s;
 
     @supports (color: color(display-p3 0 0 0)) {
-      border-color: var(--swatch-p3);
+      --color: var(--swatch-p3);
+    }
+  }
+
+  &::after {
+    z-index: -1;
+    transform: scale(1.2);
+    opacity: 0;
+  }
+
+  &.selected {
+    &::before {
+      transform: scale(0.8);
+    }
+
+    &::after {
+      opacity: 1;
     }
   }
 }
@@ -484,22 +474,24 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
+  height: 24px;
   padding: 0;
   border: none;
   background: transparent;
   font-family: inherit;
-  font-size: 0.8125rem;
+  line-height: 20px;
+  font-size: 13px;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.5);
-  cursor: pointer;
+  color: rgb(255 255 255 / 0.5);
   transition: color 0.15s ease;
+  cursor: pointer;
 
   &:hover {
-    color: rgba(255, 255, 255, 0.9);
+    color: rgb(255 255 255 / 0.9);
   }
 
   svg {
-    color: rgba(255, 255, 255, 0.4);
+    color: rgb(255 255 255 / 0.4);
     transition: color 0.15s ease;
   }
 
@@ -538,14 +530,11 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 0 12px 0;
-  margin: -6px 0 0.5rem 0;
-  border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 0;
+  height: 24px;
   background: transparent;
   font-family: inherit;
-  font-size: 0.8125rem;
+  line-height: 20px;
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.15px;
   color: #fff;
@@ -628,6 +617,7 @@
   font-weight: 400;
   color: rgb(255 255 255 / 0.2);
   transition: color 0.15s ease;
+  cursor: pointer;
 
   &.active {
     color: #66b8ff;
@@ -789,5 +779,22 @@
         background: rgba(0, 0, 0, 0.05);
       }
     }
+  }
+}
+
+.checkboxField {
+  &:not(:first-child) {
+    margin-top: 8px;
+  }
+}
+
+.divider {
+  margin-block: 8px;
+  width: 100%;
+  height: 1px;
+  background-color: rgb(26 26 26 / 0.07);
+
+  [data-agentation-theme="dark"] & {
+    background-color: rgb(255 255 255 / 0.07);
   }
 }

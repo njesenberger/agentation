@@ -62,7 +62,6 @@ export function SettingsPanel({
   return (
     <div
       className={`${styles.settingsPanel} ${isVisible ? styles.enter : styles.exit}`}
-      onClick={(e) => e.stopPropagation()}
       style={
         toolbarNearBottom
           ? { bottom: "auto", top: "calc(100% + 0.5rem)" }
@@ -75,11 +74,11 @@ export function SettingsPanel({
           className={`${styles.settingsPage} ${settingsPage === "automations" ? styles.slideLeft : ""}`}
         >
           <div className={styles.settingsHeader}>
-            <span className={styles.settingsBrand}>
+            <p className={styles.settingsBrand}>
               <span className={styles.settingsBrandSlash}>/</span>
               agentation
-            </span>
-            <span className={styles.settingsVersion}>v{__VERSION__}</span>
+            </p>
+            <p className={styles.settingsVersion}>v{__VERSION__}</p>
             <button
               className={styles.themeToggle}
               onClick={onToggleTheme}
@@ -97,6 +96,8 @@ export function SettingsPanel({
               </span>
             </button>
           </div>
+
+          <div className={styles.divider}></div>
 
           {/* Output detail + React toggle */}
           <div className={styles.settingsSection}>
@@ -178,6 +179,8 @@ export function SettingsPanel({
             </div>
           </div>
 
+          <div className={styles.divider}></div>
+
           {/* Color picker */}
           <div className={styles.settingsSection}>
             <div
@@ -187,28 +190,26 @@ export function SettingsPanel({
             </div>
             <div className={styles.colorOptions}>
               {COLOR_OPTIONS.map((color) => (
-                <div
-                  key={color.id}
-                  role="button"
-                  onClick={() =>
-                    onSettingsChange({ annotationColorId: color.id })
-                  }
+                <button
+                  className={`${styles.colorOption} ${settings.annotationColorId === color.id ? styles.selected : ""}`}
                   style={
                     {
                       "--swatch": color.srgb,
                       "--swatch-p3": color.p3,
                     } as React.CSSProperties
                   }
-                  className={`${styles.colorOptionRing} ${settings.annotationColorId === color.id ? styles.selected : ""}`}
-                >
-                  <div
-                    className={`${styles.colorOption} ${settings.annotationColorId === color.id ? styles.selected : ""}`}
-                    title={color.label}
-                  />
-                </div>
+                  onClick={() =>
+                    onSettingsChange({ annotationColorId: color.id })
+                  }
+                  title={color.label}
+                  type="button"
+                  key={color.id}
+                ></button>
               ))}
             </div>
           </div>
+
+          <div className={styles.divider}></div>
 
           {/* Checkboxes */}
           <div className={styles.settingsSection}>
@@ -231,39 +232,37 @@ export function SettingsPanel({
             />
           </div>
 
+          <div className={styles.divider} />
+
           {/* Nav to automations */}
-          <div
-            className={`${styles.settingsSection} ${styles.settingsSectionExtraPadding}`}
+          <button
+            className={styles.settingsNavLink}
+            onClick={() => onSettingsPageChange("automations")}
           >
-            <button
-              className={styles.settingsNavLink}
-              onClick={() => onSettingsPageChange("automations")}
-            >
-              <span>Manage MCP & Webhooks</span>
-              <span className={styles.settingsNavLinkRight}>
-                {endpoint && connectionStatus !== "disconnected" && (
-                  <span
-                    className={`${styles.mcpNavIndicator} ${styles[connectionStatus]}`}
-                  />
-                )}
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M7.5 12.5L12 8L7.5 3.5"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </span>
-            </button>
-          </div>
+            <span>Manage MCP & Webhooks</span>
+            <span className={styles.settingsNavLinkRight}>
+              {endpoint && connectionStatus !== "disconnected" && (
+                <span
+                  className={`${styles.mcpNavIndicator} ${styles[connectionStatus]}`}
+                />
+              )}
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M7.5 12.5L12 8L7.5 3.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+          </button>
         </div>
 
         {/* ── Automations page ── */}
@@ -277,6 +276,8 @@ export function SettingsPanel({
             <IconChevronLeft size={16} />
             <span>Manage MCP & Webhooks</span>
           </button>
+
+          <div className={styles.divider}></div>
 
           {/* MCP section */}
           <div className={styles.settingsSection}>
@@ -313,6 +314,8 @@ export function SettingsPanel({
               </a>
             </p>
           </div>
+
+          <div className={styles.divider}></div>
 
           {/* Webhooks section */}
           <div
