@@ -3575,9 +3575,9 @@ export function PageFeedbackToolbarCSS({
   };
 
   return createPortal(
-    <ShadowRoot ref={portalWrapperRef} host="agentation-toolbar" style={{ display: "contents" }}>
+    <ShadowRoot host="agentation-toolbar" style={{ display: "contents" }}>
       <style>{shadowCss}{agentationColorTokensCss}</style>
-      <div style={{ display: "contents" }} data-agentation-theme={isDarkMode ? "dark" : "light"} data-agentation-accent={settings.annotationColorId} data-agentation-root="">
+      <div ref={portalWrapperRef} style={{ display: "contents" }} data-agentation-theme={isDarkMode ? "dark" : "light"} data-agentation-accent={settings.annotationColorId} data-agentation-root="">
           {/* Toolbar */}
           <div
             className={`${styles.toolbar}${userClassName ? ` ${userClassName}` : ""}`}
