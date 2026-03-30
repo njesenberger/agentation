@@ -98,6 +98,7 @@ import { css as annotationMarkerCss } from "./annotation-marker/styles.module.sc
 import { css as checkboxFieldCss } from "./settings-panel/checkbox-field/styles.module.scss";
 import { css as settingsPanelCss } from "./settings-panel/styles.module.scss";
 import { css as switchCss } from "../switch/styles.module.scss";
+import { useShadowRoot } from "../../utils/use-shadow-root";
 
 const shadowCss = [
   resetCss,
@@ -1823,7 +1824,7 @@ export function PageFeedbackToolbarCSS({
     ].join(", ");
 
     const style = document.createElement("style");
-    style.id = "feedback-cursor-styles";
+    style.id = "agentation-cursor";
     // Text elements get text cursor (higher specificity with body prefix)
     // Everything else gets crosshair
     style.textContent = `
@@ -1833,7 +1834,7 @@ export function PageFeedbackToolbarCSS({
     document.head.appendChild(style);
 
     return () => {
-      const existingStyle = document.getElementById("feedback-cursor-styles");
+      const existingStyle = document.getElementById("agentation-cursor");
       if (existingStyle) existingStyle.remove();
     };
   }, [isActive]);
@@ -3514,9 +3515,6 @@ export function PageFeedbackToolbarCSS({
     pendingMultiSelectElements,
   ]);
 
-  if (!mounted) return null;
-  if (isToolbarHidden) return null;
-
   const hasAnnotations = annotations.length > 0;
 
   // Filter annotations for rendering (exclude exiting ones from normal flow)
@@ -3573,6 +3571,11 @@ export function PageFeedbackToolbarCSS({
 
     return styles;
   };
+
+  const shadowRoot = useShadowRoot(portalWrapperRef);
+  
+  if (!mounted) return null;
+  if (isToolbarHidden) return null;
 
   return createPortal(
     <ShadowRoot host="agentation-toolbar" style={{ display: "contents" }}>
@@ -3938,7 +3941,7 @@ export function PageFeedbackToolbarCSS({
                       didDrag = true;
                       preview = document.createElement("div");
                       preview.className = `${designStyles.dragPreview}${blankCanvas ? ` ${designStyles.dragPreviewWireframe}` : ""}`;
-                      document.body.appendChild(preview);
+                      portalWrapperRef.current?.appendChild(preview);
                     }
 
                     if (!preview) return;
@@ -3966,7 +3969,7 @@ export function PageFeedbackToolbarCSS({
                   const onUp = (ev: MouseEvent) => {
                     window.removeEventListener("mousemove", onMove);
                     window.removeEventListener("mouseup", onUp);
-                    if (preview) document.body.removeChild(preview);
+                    if (preview) preview.remove();
 
                     if (didDrag) {
                       const w = def.width;
@@ -4138,7 +4141,7 @@ export function PageFeedbackToolbarCSS({
               isDarkMode={isDarkMode}
               exiting={designOverlayExiting}
               blankCanvas={blankCanvas}
-            extraSnapRects={designPlacements.map(p => ({ x: p.x, y: p.y, width: p.width, height: p.height }))}
+              extraSnapRects={designPlacements.map(p => ({ x: p.x, y: p.y, width: p.width, height: p.height }))}
               clearSignal={rearrangeClearSignal}
               deselectSignal={rearrangeDeselectSignal}
               onSelectionChange={(ids, isShift) => {
