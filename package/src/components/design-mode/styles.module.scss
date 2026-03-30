@@ -327,6 +327,7 @@ $red: #ef4444;
     border-color 0.15s,
     opacity 0.15s ease,
     transform 0.15s ease;
+  -webkit-user-select: none;
   user-select: none;
   pointer-events: auto;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
@@ -924,6 +925,7 @@ $red: #ef4444;
     background-color 0.15s ease,
     border-color 0.15s ease;
   border: 1px solid transparent;
+  -webkit-user-select: none;
   user-select: none;
   min-height: 24px;
 
@@ -1242,6 +1244,7 @@ $red: #ef4444;
   z-index: 99995;
   pointer-events: none;
   cursor: default;
+  -webkit-user-select: none;
   user-select: none;
   animation: overlayFadeIn 0.15s ease;
 }
@@ -1278,6 +1281,7 @@ $red: #ef4444;
     border-color 0.3s,
     background-color 0.3s,
     border-style 0s;
+  -webkit-user-select: none;
   user-select: none;
   pointer-events: auto;
   animation: sectionEnter 0.2s ease;
@@ -1453,6 +1457,7 @@ $red: #ef4444;
   color: rgba(0, 0, 0, 0.32);
   letter-spacing: 0.02em;
   white-space: nowrap;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -1552,6 +1557,7 @@ $red: #ef4444;
   background: rgba(59, 130, 246, 0.04);
   cursor: grab;
   opacity: 0.5;
+  -webkit-user-select: none;
   user-select: none;
   pointer-events: auto;
   animation: ghostEnter 0.25s ease;
@@ -1648,6 +1654,7 @@ $red: #ef4444;
   border-radius: 4px;
   background: transparent;
   pointer-events: none;
+  -webkit-user-select: none;
   user-select: none;
   animation: sectionEnter 0.2s ease;
 }

@@ -202,6 +202,7 @@
 
 .toolbarContainer {
   position: relative;
+  -webkit-user-select: none;
   user-select: none;
   margin-left: auto;
   align-self: flex-end;
@@ -310,6 +311,7 @@
   position: absolute;
   top: -13px;
   right: -13px;
+  -webkit-user-select: none;
   user-select: none;
   min-width: 18px;
   height: 18px;
@@ -917,6 +919,7 @@
   box-shadow:
     0 2px 6px rgba(0, 0, 0, 0.2),
     inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+  -webkit-user-select: none;
   user-select: none;
   will-change: transform, opacity;
   contain: layout style;

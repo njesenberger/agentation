@@ -292,8 +292,12 @@ export function RearrangeOverlay({ rearrangeState, onChange, isDarkMode, exiting
   // --- Prevent text selection while rearrange mode is active ---
   useEffect(() => {
     const prev = document.body.style.userSelect;
+    document.body.style.webkitUserSelect = "none";
     document.body.style.userSelect = "none";
-    return () => { document.body.style.userSelect = prev; };
+    return () => { 
+      document.body.style.webkitUserSelect = prev;
+      document.body.style.userSelect = prev;
+    };
   }, []);
 
   // --- Mousedown to capture new elements (+ immediate drag) ---
