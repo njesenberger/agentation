@@ -33,9 +33,11 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "openai": "^6.33.0",
     "better-sqlite3": "^12.6.2",
-    "zod": "^3.23.0"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

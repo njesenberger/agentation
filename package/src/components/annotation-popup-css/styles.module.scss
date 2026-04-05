@@ -319,6 +319,18 @@
   }
 }
 
+.agentHint {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.15);
+  align-self: center;
+  margin-right: auto;
+  letter-spacing: 0.5px;
+
+  &.light {
+    color: rgba(0, 0, 0, 0.12);
+  }
+}
+
 // Delete button wrapper
 .deleteWrapper {
   margin-right: auto;

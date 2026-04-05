@@ -218,6 +218,8 @@ function rowToAnnotation(row: Record<string, unknown>): Annotation {
     kind,
     ...(kind === "placement" && extra?.placement ? { placement: extra.placement } : {}),
     ...(kind === "rearrange" && extra?.rearrange ? { rearrange: extra.rearrange } : {}),
+    ...(extra?.sourceFile ? { sourceFile: extra.sourceFile } : {}),
+    ...(extra?.elementBoundingBoxes ? { elementBoundingBoxes: extra.elementBoundingBoxes } : {}),
     url: row.url as string | undefined,
     intent: row.intent as Annotation["intent"],
     severity: row.severity as Annotation["severity"],
@@ -402,13 +404,15 @@ export function createSQLiteStore(dbPath?: string): AFSStore {
         createdAt: new Date().toISOString(),
       };
 
-      // Build extra JSON for structured data (placement/rearrange)
-      let extraJson: string | null = null;
-      if (annotation.placement) {
-        extraJson = JSON.stringify({ placement: annotation.placement });
-      } else if (annotation.rearrange) {
-        extraJson = JSON.stringify({ rearrange: annotation.rearrange });
-      }
+      // Build extra JSON for structured data (placement/rearrange/sourceFile)
+      const extraData: Record<string, unknown> = {};
+      if (annotation.placement) extraData.placement = annotation.placement;
+      if (annotation.rearrange) extraData.rearrange = annotation.rearrange;
+      // Preserve sourceFile and any other untyped fields from the browser
+      const ann = annotation as Record<string, unknown>;
+      if (ann.sourceFile) extraData.sourceFile = ann.sourceFile;
+      if (ann.elementBoundingBoxes) extraData.elementBoundingBoxes = ann.elementBoundingBoxes;
+      const extraJson = Object.keys(extraData).length > 0 ? JSON.stringify(extraData) : null;
 
       stmts.insertAnnotation.run({
         id: annotation.id,

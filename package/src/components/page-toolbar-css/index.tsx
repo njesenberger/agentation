@@ -21,7 +21,9 @@ import {
   IconChevronRight,
   IconLayout,
   IconHelp,
+  IconChatEllipsis,
 } from "../icons";
+import { ChatPanel, type ChatPanelHandle } from "./chat-panel";
 import { Tooltip } from "../tooltip";
 import { HelpTooltip } from "../help-tooltip";
 import { DesignMode } from "../design-mode";
@@ -433,6 +435,8 @@ export function PageFeedbackToolbarCSS({
   const [isFrozen, setIsFrozen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSettingsVisible, setShowSettingsVisible] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [showChatVisible, setShowChatVisible] = useState(false);
   const [settingsPage, setSettingsPage] = useState<"main" | "automations">(
     "main",
   );
@@ -659,6 +663,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
   const popupRef = useRef<AnnotationPopupCSSHandle>(null);
   const editPopupRef = useRef<AnnotationPopupCSSHandle>(null);
+  const chatPanelRef = useRef<ChatPanelHandle>(null);
   const scrollTimeoutRef = useRef<ReturnType<typeof originalSetTimeout> | null>(null);
 
   const pathname =
@@ -688,6 +693,16 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       return () => clearTimeout(timer);
     }
   }, [showSettings]);
+
+  // Handle showChat changes with exit animation
+  useEffect(() => {
+    if (showChat) {
+      setShowChatVisible(true);
+    } else {
+      const timer = originalSetTimeout(() => setShowChatVisible(false), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [showChat]);
 
   // Unified marker visibility - depends on toolbar active, showMarkers toggle, and not blank canvas
   // This single effect handles all marker show/hide animations
@@ -2746,7 +2761,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
   // Add annotation
   const addAnnotation = useCallback(
-    (comment: string) => {
+    (comment: string): Promise<void> | undefined => {
       if (!pendingAnnotation) return;
 
       const newAnnotation: Annotation = {
@@ -2808,8 +2823,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       window.getSelection()?.removeAllRanges();
 
       // Sync to server (non-blocking, but update local ID with server's ID)
+      // Returns the promise so callers (e.g. onSubmitToAgent) can await sync completion
       if (endpoint && currentSessionId) {
-        syncAnnotation(endpoint, currentSessionId, newAnnotation)
+        return syncAnnotation(endpoint, currentSessionId, newAnnotation)
           .then((serverAnnotation) => {
             // Update local annotation with server-assigned ID
             if (serverAnnotation.id !== newAnnotation.id) {
@@ -3569,6 +3585,60 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         return;
       }
 
+      // Cmd+Enter to send layout/rearrange changes to agent
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && endpoint && currentSessionId) {
+        // Check if there are rearrange changes to send
+        if (rearrangeState) {
+          const rearrangeOutput = generateRearrangeOutput(rearrangeState, settings.outputDetail, {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          });
+          if (rearrangeOutput) {
+            e.preventDefault();
+            setAgentActivity({ active: true, summary: "Working on it...", event: "tool_use" });
+            setShowActivityLabel(true);
+            fetch(`${endpoint}/chat/message`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                sessionId: currentSessionId,
+                message: `Apply these layout changes.\nPage URL: ${window.location.href}\n\n${rearrangeOutput}`,
+              }),
+            }).then(async (resp) => {
+              if (!resp.ok) { setAgentActivity(null); setShowActivityLabel(false); return; }
+              const reader = resp.body?.getReader();
+              if (reader) { while (true) { const { done } = await reader.read(); if (done) break; } }
+            }).catch(() => { setAgentActivity(null); setShowActivityLabel(false); });
+            return;
+          }
+        }
+        // Check if there are design placements to send
+        if (designPlacements.length > 0) {
+          const designOutput = generateDesignOutput(designPlacements, {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          }, { blankCanvas, wireframePurpose: wireframePurpose || undefined }, settings.outputDetail);
+          if (designOutput) {
+            e.preventDefault();
+            setAgentActivity({ active: true, summary: "Working on it...", event: "tool_use" });
+            setShowActivityLabel(true);
+            fetch(`${endpoint}/chat/message`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                sessionId: currentSessionId,
+                message: `Apply these design changes.\nPage URL: ${window.location.href}\n\n${designOutput}`,
+              }),
+            }).then(async (resp) => {
+              if (!resp.ok) { setAgentActivity(null); setShowActivityLabel(false); return; }
+              const reader = resp.body?.getReader();
+              if (reader) { while (true) { const { done } = await reader.read(); if (done) break; } }
+            }).catch(() => { setAgentActivity(null); setShowActivityLabel(false); });
+            return;
+          }
+        }
+      }
+
       // Skip other shortcuts if typing or modifier keys are held
       if (isTyping || e.metaKey || e.ctrlKey) return;
 
@@ -3657,6 +3727,11 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     copyOutput,
     clearAll,
     pendingMultiSelectElements,
+    endpoint,
+    currentSessionId,
+    settings.outputDetail,
+    blankCanvas,
+    wireframePurpose,
   ]);
 
   if (!mounted) return null;
@@ -3739,7 +3814,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       >
         {/* Morphing container */}
         <div
-          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${isDraggingToolbar ? styles.dragging : ""} ${toolbarPulse === 'edit' ? styles.editPulse : ""} ${toolbarPulse === 'resolve' ? styles.resolvePulse : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
+          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${isDraggingToolbar ? styles.dragging : ""} ${toolbarPulse === 'edit' ? styles.editPulse : ""} ${toolbarPulse === 'resolve' ? styles.resolvePulse : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) || endpoint ? styles.serverConnected : ""}`}
           onClick={
             !isActive
               ? (e) => {
@@ -3974,6 +4049,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                   e.stopPropagation();
                   hideTooltipsUntilMouseLeave();
                   if (isDesignMode) closeDesignMode();
+                  if (showChat) setShowChat(false);
                   setShowSettings(!showSettings);
                 }}
               >
@@ -4008,6 +4084,24 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               )}
               <span className={styles.buttonTooltip}>Settings</span>
             </div>
+
+            {endpoint && (
+              <div className={styles.buttonWrapper}>
+                <button
+                  className={styles.controlButton}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    hideTooltipsUntilMouseLeave();
+                    if (isDesignMode) closeDesignMode();
+                    if (showSettings) setShowSettings(false);
+                    setShowChat(!showChat);
+                  }}
+                >
+                  <IconChatEllipsis size={22} />
+                </button>
+                <span className={styles.buttonTooltip}>AI Chat</span>
+              </div>
+            )}
 
             <div
               className={styles.divider}
@@ -4187,6 +4281,17 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             onSettingsPageChange={setSettingsPage}
             onHideToolbar={hideToolbarTemporarily}
           />
+
+          {showChatVisible && endpoint && currentSessionId && (
+            <ChatPanel
+              ref={chatPanelRef}
+              endpoint={endpoint}
+              sessionId={currentSessionId}
+              isVisible={showChat}
+              toolbarNearBottom={!!toolbarPosition && toolbarPosition.y < 230}
+              isDarkMode={isDarkMode}
+            />
+          )}
         </div>
       </div>
 
@@ -4719,6 +4824,60 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                             : "What should change?"
                       }
                       onSubmit={addAnnotation}
+                      onSubmitToAgent={endpoint ? (comment: string) => {
+                        // Capture annotation context before addAnnotation clears pendingAnnotation
+                        const context = pendingAnnotation ? {
+                          element: pendingAnnotation.element,
+                          elementPath: pendingAnnotation.elementPath,
+                          sourceFile: pendingAnnotation.sourceFile,
+                          nearbyText: pendingAnnotation.nearbyText,
+                          reactComponents: pendingAnnotation.reactComponents,
+                        } : null;
+
+                        const syncPromise = addAnnotation(comment);
+                        // Instant visual feedback
+                        setAgentActivity({ active: true, summary: "Working on it...", event: "tool_use" });
+                        setShowActivityLabel(true);
+
+                        // Build enriched message with annotation context
+                        const contextParts: string[] = [`Fix this annotation: "${comment}"`];
+                        if (context) {
+                          if (context.sourceFile) contextParts.push(`Source: ${context.sourceFile}`);
+                          if (context.nearbyText) contextParts.push(`Current text: "${context.nearbyText}"`);
+                          if (context.elementPath) contextParts.push(`Element: ${context.elementPath}`);
+                          if (context.reactComponents) contextParts.push(`React: ${context.reactComponents}`);
+                        }
+                        const enrichedMessage = contextParts.join("\n");
+
+                        // Fire agent immediately — don't wait for annotation sync
+                        // The enriched message contains all the context the agent needs
+                        if (currentSessionId) {
+                          fetch(`${endpoint}/chat/message`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              sessionId: currentSessionId,
+                              message: enrichedMessage,
+                            }),
+                          }).then(async (resp) => {
+                            if (!resp.ok) {
+                              setAgentActivity(null);
+                              setShowActivityLabel(false);
+                              return;
+                            }
+                            const reader = resp.body?.getReader();
+                            if (reader) {
+                              while (true) {
+                                const { done } = await reader.read();
+                                if (done) break;
+                              }
+                            }
+                          }).catch(() => {
+                            setAgentActivity(null);
+                            setShowActivityLabel(false);
+                          });
+                        }
+                      } : undefined}
                       onCancel={cancelAnnotation}
                       isExiting={pendingExiting}
                       lightMode={!isDarkMode}

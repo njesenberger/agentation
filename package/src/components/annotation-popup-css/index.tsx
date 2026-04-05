@@ -43,6 +43,8 @@ export interface AnnotationPopupCSSProps {
   submitLabel?: string;
   /** Called when annotation is submitted with text */
   onSubmit: (text: string) => void;
+  /** Called when annotation is submitted AND sent to agent (Cmd+Enter) */
+  onSubmitToAgent?: (text: string) => void;
   /** Called when popup is cancelled/dismissed */
   onCancel: () => void;
   /** Called when delete button is clicked (only shown if provided) */
@@ -78,6 +80,7 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
       initialValue = "",
       submitLabel = "Add",
       onSubmit,
+      onSubmitToAgent,
       onCancel,
       onDelete,
       style,
@@ -165,6 +168,12 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         e.stopPropagation();
         if (e.nativeEvent.isComposing) return;
+        if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && onSubmitToAgent) {
+          e.preventDefault();
+          if (!text.trim()) return;
+          onSubmitToAgent(text.trim());
+          return;
+        }
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
           handleSubmit();
@@ -173,7 +182,7 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
           handleCancel();
         }
       },
-      [handleSubmit, handleCancel]
+      [handleSubmit, handleCancel, onSubmitToAgent, text]
     );
 
     const popupClassName = [
@@ -276,6 +285,11 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
                 <IconTrash size={22} />
               </button>
             </div>
+          )}
+          {onSubmitToAgent && isFocused && (
+            <span className={`${styles.agentHint} ${lightMode ? styles.light : ""}`}>
+              ⌘↵ fix
+            </span>
           )}
           <button className={styles.cancel} onClick={handleCancel}>
             Cancel

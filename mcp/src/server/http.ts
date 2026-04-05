@@ -25,6 +25,13 @@ import {
   getEventsSince,
 } from "./store.js";
 import { eventBus } from "./events.js";
+import {
+  setApiKey,
+  hasApiKey,
+  getProviderType,
+  handleChatMessage,
+  clearChatHistory,
+} from "./chat.js";
 import type { Annotation, AFSEvent, ActionRequest, AgentStatusPayload } from "../types.js";
 
 /**
@@ -1003,6 +1010,41 @@ async function handleMcp(req: IncomingMessage, res: ServerResponse): Promise<voi
 }
 
 // -----------------------------------------------------------------------------
+// Chat Handlers
+// -----------------------------------------------------------------------------
+
+const setChatApiKeyHandler: RouteHandler = async (req, res) => {
+  const body = await parseBody<{ apiKey?: string }>(req);
+  if (!body.apiKey) return sendError(res, 400, "apiKey is required");
+  try {
+    const result = setApiKey(body.apiKey);
+    sendJson(res, 200, { success: true, provider: result.provider });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Invalid API key";
+    sendError(res, 400, message);
+  }
+};
+
+const getChatApiKeyHandler: RouteHandler = async (_req, res) => {
+  sendJson(res, 200, {
+    configured: hasApiKey(),
+    provider: getProviderType(),
+  });
+};
+
+const chatMessageHandler: RouteHandler = async (req, res) => {
+  const body = await parseBody<{ sessionId?: string; message?: string }>(req);
+  if (!body.message) return sendError(res, 400, "message is required");
+  if (!body.sessionId) return sendError(res, 400, "sessionId is required");
+  await handleChatMessage(body.sessionId, body.message, res);
+};
+
+const clearChatHistoryHandler: RouteHandler = async (_req, res, params) => {
+  clearChatHistory(params.id);
+  sendJson(res, 200, { success: true });
+};
+
+// -----------------------------------------------------------------------------
 // Router
 // -----------------------------------------------------------------------------
 
@@ -1090,6 +1132,31 @@ const routes: Route[] = [
     method: "POST",
     pattern: /^\/annotations\/([^/]+)\/thread$/,
     handler: addThreadHandler,
+    paramNames: ["id"],
+  },
+  // Chat routes
+  {
+    method: "POST",
+    pattern: /^\/chat\/api-key$/,
+    handler: setChatApiKeyHandler,
+    paramNames: [],
+  },
+  {
+    method: "GET",
+    pattern: /^\/chat\/api-key$/,
+    handler: getChatApiKeyHandler,
+    paramNames: [],
+  },
+  {
+    method: "POST",
+    pattern: /^\/chat\/message$/,
+    handler: chatMessageHandler,
+    paramNames: [],
+  },
+  {
+    method: "DELETE",
+    pattern: /^\/chat\/history\/([^/]+)$/,
+    handler: clearChatHistoryHandler,
     paramNames: ["id"],
   },
 ];
