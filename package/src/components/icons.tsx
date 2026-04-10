@@ -65,40 +65,33 @@ export const IconListSparkle = ({
   style?: React.CSSProperties;
 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
-    <g clipPath="url(#clip0_list_sparkle)">
-      <path
-        d="M11.5 12L5.5 12"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M18.5 6.75L5.5 6.75"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M9.25 17.25L5.5 17.25"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M16 12.75L16.5179 13.9677C16.8078 14.6494 17.3506 15.1922 18.0323 15.4821L19.25 16L18.0323 16.5179C17.3506 16.8078 16.8078 17.3506 16.5179 18.0323L16 19.25L15.4821 18.0323C15.1922 17.3506 14.6494 16.8078 13.9677 16.5179L12.75 16L13.9677 15.4821C14.6494 15.1922 15.1922 14.6494 15.4821 13.9677L16 12.75Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-    </g>
-    <defs>
-      <clipPath id="clip0_list_sparkle">
-        <rect width="24" height="24" fill="white" />
-      </clipPath>
-    </defs>
+    <path
+      d="M11.5 12L5.5 12"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M18.5 6.75L5.5 6.75"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9.25 17.25L5.5 17.25"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M16 12.75L16.5179 13.9677C16.8078 14.6494 17.3506 15.1922 18.0323 15.4821L19.25 16L18.0323 16.5179C17.3506 16.8078 16.8078 17.3506 16.5179 18.0323L16 19.25L15.4821 18.0323C15.1922 17.3506 14.6494 16.8078 13.9677 16.5179L12.75 16L13.9677 15.4821C14.6494 15.1922 15.1922 14.6494 15.4821 13.9677L16 12.75Z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
@@ -210,7 +203,13 @@ export const IconCopyAnimated = ({
   copied?: boolean;
   tint?: string;
 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={tint ? { color: tint, transition: 'color 0.3s ease' } : undefined}>
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    style={tint ? { color: tint, transition: "color 0.3s ease" } : undefined}
+  >
     {/* Copy icon */}
     <g
       className={`${s.iconState} ${copied ? s.hiddenScaled : s.visibleScaled}`}
@@ -719,8 +718,10 @@ export const IconXmark = ({ size = 16 }: { size?: number }) => (
 export const IconXmarkLarge = ({ size = 24 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <path
-      d="M16.7198 6.21973C17.0127 5.92683 17.4874 5.92683 17.7803 6.21973C18.0732 6.51262 18.0732 6.9874 17.7803 7.28027L13.0606 12L17.7803 16.7197C18.0732 17.0126 18.0732 17.4874 17.7803 17.7803C17.4875 18.0731 17.0127 18.0731 16.7198 17.7803L12.0001 13.0605L7.28033 17.7803C6.98746 18.0731 6.51268 18.0731 6.21979 17.7803C5.92689 17.4874 5.92689 17.0126 6.21979 16.7197L10.9395 12L6.21979 7.28027C5.92689 6.98738 5.92689 6.51262 6.21979 6.21973C6.51268 5.92683 6.98744 5.92683 7.28033 6.21973L12.0001 10.9395L16.7198 6.21973Z"
-      fill="currentColor"
+      d="M6.75 6.75L17.25 17.25M17.25 6.75L6.75 17.25"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
     />
   </svg>
 );
@@ -1044,28 +1045,8 @@ export const AnimatedBunny = ({
 // Layout / grid icon for layout mode
 export const IconLayout = ({ size = 24 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <rect
-      x="3"
-      y="3"
-      width="18"
-      height="18"
-      rx="2"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    />
-    <line
-      x1="3"
-      y1="9"
-      x2="21"
-      y2="9"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    />
-    <line
-      x1="9"
-      y1="9"
-      x2="9"
-      y2="21"
+    <path
+      d="M6.75 4.75H17.25C18.35 4.75 19.25 5.65 19.25 6.75V17.25C19.25 18.35 18.35 19.25 17.25 19.25H6.75C5.65 19.25 4.75 18.35 4.75 17.25V6.75C4.75 5.65 5.65 4.75 6.75 4.75M4.75 8.75H19.25M9.75 8.75V19.25"
       stroke="currentColor"
       strokeWidth="1.5"
     />

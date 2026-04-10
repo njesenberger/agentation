@@ -49,8 +49,8 @@ export interface AnnotationPopupCSSProps {
   onDelete?: () => void;
   /** Position styles (left, top) */
   style?: React.CSSProperties;
-  /** Custom color for submit button and textarea focus (hex) */
-  accentColor?: string;
+  /** Weither multiple elements are selected */
+  isMultiSelect?: boolean;
   /** External exit state (parent controls exit animation) */
   isExiting?: boolean;
   /** Light mode styling */
@@ -81,7 +81,7 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
       onCancel,
       onDelete,
       style,
-      accentColor = "#3c82f7",
+      isMultiSelect,
       isExiting = false,
       lightMode = false,
       computedStyles,
@@ -91,7 +91,6 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
     const [text, setText] = useState(initialValue);
     const [isShaking, setIsShaking] = useState(false);
     const [animState, setAnimState] = useState<"initial" | "enter" | "entered" | "exit">("initial");
-    const [isFocused, setIsFocused] = useState(false);
     const [isStylesExpanded, setIsStylesExpanded] = useState(false); // Computed styles accordion state
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
@@ -188,7 +187,7 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
     return (
       <div
         ref={popupRef}
-        className={popupClassName}
+        className={`${popupClassName} ${isMultiSelect ? styles.multiSelect : ""}`}
         data-annotation-popup
         style={style}
         onClick={(e) => e.stopPropagation()}
@@ -216,7 +215,7 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
                 xmlns="http://www.w3.org/2000/svg"
               >
                 <path
-                  d="M5.5 10.25L9 7.25L5.75 4"
+                  d="M5.5 3.75L9 7L5.5 10.25"
                   stroke="currentColor"
                   strokeWidth="1.5"
                   strokeLinecap="round"
@@ -259,12 +258,9 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
         <textarea
           ref={textareaRef}
           className={styles.textarea}
-          style={{ borderColor: isFocused ? accentColor : undefined }}
           placeholder={placeholder}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
           rows={2}
           onKeyDown={handleKeyDown}
         />
@@ -273,7 +269,7 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
           {onDelete && (
             <div className={styles.deleteWrapper}>
               <button className={styles.deleteButton} onClick={onDelete} type="button">
-                <IconTrash size={22} />
+                <IconTrash />
               </button>
             </div>
           )}
@@ -282,10 +278,6 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
           </button>
           <button
             className={styles.submit}
-            style={{
-              backgroundColor: accentColor,
-              opacity: text.trim() ? 1 : 0.4,
-            }}
             onClick={handleSubmit}
             disabled={!text.trim()}
           >

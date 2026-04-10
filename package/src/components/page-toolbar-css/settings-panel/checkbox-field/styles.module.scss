@@ -9,10 +9,10 @@
   line-height: 20px;
   font-size: 13px;
   letter-spacing: -0.15px;
-  color: rgb(26 26 26 / 0.5);
+  color: #1a1a1a;
   cursor: pointer;
 
   [data-agentation-theme="dark"] & {
-    color: rgb(255 255 255 / 0.5);
+    color: #fff;
   }
 }

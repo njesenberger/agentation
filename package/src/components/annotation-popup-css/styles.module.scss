@@ -1,24 +1,3 @@
-// Annotation Popup - CSS-only version (no framer-motion)
-// Uses CSS animations for all transitions
-
-// Protect stroke-based icons from host page `svg { fill: currentColor }` rules.
-// Scoped to agentation's own containers to avoid breaking host SVGs that use
-// fill="none" with CSS-based fills (e.g. Tailwind's fill-current).
-// See: https://github.com/benjitaylor/agentation/issues/58
-.popup {
-  svg[fill="none"] {
-    fill: none !important;
-  }
-
-  svg[fill="none"] :not([fill]) {
-    fill: none !important;
-  }
-}
-
-// =============================================================================
-// Animation Keyframes
-// =============================================================================
-
 @keyframes popupEnter {
   from {
     opacity: 0;
@@ -87,6 +66,13 @@
   // Initial state (before animation)
   opacity: 0;
 
+  [data-agentation-theme="light"] & {
+    background-color: #fff;
+    box-shadow:
+      0 4px 24px rgb(0 0 0 / 0.12),
+      0 0 0 1px rgb(0 0 0 / 0.06);
+  }
+
   &.enter {
     animation: popupEnter 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
@@ -121,12 +107,16 @@
 .element {
   font-size: 0.75rem;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgb(255 255 255 / 0.5);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+
+  [data-agentation-theme="light"] & {
+    color: rgb(26 26 26 / 0.5);
+  }
 }
 
 .headerToggle {
@@ -140,10 +130,6 @@
   flex: 1;
   min-width: 0;
   text-align: left;
-
-  .element {
-    flex: 1;
-  }
 }
 
 // Chevron icon that rotates when computed styles are expanded
@@ -151,6 +137,10 @@
   color: rgba(255, 255, 255, 0.5);
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); // Matches FAQ accordion easing
   flex-shrink: 0;
+
+  [data-agentation-theme="light"] & {
+    color: rgb(26 26 26 / 0.5);
+  }
 
   &.expanded {
     transform: rotate(90deg);
@@ -188,29 +178,49 @@
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.6875rem;
   line-height: 1.5;
+
+  [data-agentation-theme="light"] & {
+    background-color: rgb(0 0 0 / 0.03);
+  }
 }
 
 .styleLine {
   color: rgba(255, 255, 255, 0.85);
   word-break: break-word;
+
+  [data-agentation-theme="light"] & {
+    color: rgb(0 0 0 / 0.75);
+  }
 }
 
 // Syntax highlighting colors (purple for properties, light for values)
 .styleProperty {
   color: #c792ea;
+
+  [data-agentation-theme="light"] & {
+    color: #7c3aed;
+  }
 }
 
 .styleValue {
-  color: rgba(255, 255, 255, 0.85);
+  color: rgb(255 255 255 / 0.85);
+
+  [data-agentation-theme="light"] & {
+    color: rgba(0 0 0 / 0.75);
+  }
 }
 
 .timestamp {
   font-size: 0.625rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgb(255 255 255 / 0.35);
   font-variant-numeric: tabular-nums;
   margin-left: 0.5rem;
   flex-shrink: 0;
+
+  [data-agentation-theme="light"] & {
+    color: rgb(26 26 26 / 0.5);
+  }
 }
 
 // =============================================================================
@@ -220,12 +230,17 @@
 .quote {
   font-size: 12px;
   font-style: italic;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255 255 255 / 0.6);
   margin-bottom: 0.5rem;
   padding: 0.4rem 0.5rem;
-  background: rgba(255, 255, 255, 0.05);
+  background-color: rgba(255, 255, 255, 0.05);
   border-radius: 0.25rem;
   line-height: 1.45;
+
+  [data-agentation-theme="light"] & {
+    background-color: rgb(0 0 0 / 0.04);
+    color: rgb(0 0 0 / 0.55);
+  }
 }
 
 // =============================================================================
@@ -246,11 +261,25 @@
   outline: none;
   transition: border-color 0.15s ease;
 
-  &:focus {
-    border-color: var(--agentation-color-blue);
+  [data-agentation-theme="light"] & {
+    background: rgba(0, 0, 0, 0.03);
+    color: #1a1a1a;
+    border-color: rgba(0, 0, 0, 0.12);
+
+    &::placeholder {
+      color: rgba(0, 0, 0, 0.4);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+    }
   }
 
-  &.green:focus {
+  &:focus {
+    border-color: var(--agentation-color-accent);
+  }
+
+  .multiSelect &:focus {
     border-color: var(--agentation-color-green);
   }
 
@@ -290,11 +319,12 @@
   font-weight: 500;
   border-radius: 1rem;
   border: none;
-  cursor: pointer;
   transition:
     background-color 0.15s ease,
     color 0.15s ease,
+    filter 0.15s ease,
     opacity 0.15s ease;
+  cursor: pointer;
 }
 
 .cancel {
@@ -305,16 +335,31 @@
     background: rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.8);
   }
+
+  [data-agentation-theme="light"] & {
+    color: rgba(0, 0, 0, 0.5);
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.06);
+      color: rgba(0, 0, 0, 0.75);
+    }
+  }
 }
 
 .submit {
-  color: white;
+  color: #fff;
+  background-color: var(--agentation-color-accent);
+
+  .multiSelect & {
+    background-color: var(--agentation-color-green);
+  }
 
   &:hover:not(:disabled) {
     filter: brightness(0.9);
   }
 
   &:disabled {
+    opacity: 0.4;
     cursor: not-allowed;
   }
 }
@@ -340,6 +385,10 @@
     color 0.15s ease,
     transform 0.1s ease;
 
+  [data-agentation-theme="light"] & {
+    color: rgb(0 0 0 / 0.4);
+  }
+
   &:hover {
     background-color: color-mix(
       in srgb,
@@ -351,87 +400,5 @@
 
   &:active {
     transform: scale(0.92);
-  }
-}
-
-// =============================================================================
-// Light Mode
-// =============================================================================
-
-.light {
-  &.popup {
-    background: #fff;
-    box-shadow:
-      0 4px 24px rgba(0, 0, 0, 0.12),
-      0 0 0 1px rgba(0, 0, 0, 0.06);
-  }
-
-  .element {
-    color: rgba(0, 0, 0, 0.6);
-  }
-
-  .timestamp {
-    color: rgba(0, 0, 0, 0.4);
-  }
-
-  .chevron {
-    color: rgba(0, 0, 0, 0.4);
-  }
-
-  .stylesBlock {
-    background: rgba(0, 0, 0, 0.03);
-  }
-
-  .styleLine {
-    color: rgba(0, 0, 0, 0.75);
-  }
-
-  .styleProperty {
-    color: #7c3aed;
-  }
-
-  .styleValue {
-    color: rgba(0, 0, 0, 0.75);
-  }
-
-  .quote {
-    color: rgba(0, 0, 0, 0.55);
-    background: rgba(0, 0, 0, 0.04);
-  }
-
-  .textarea {
-    background: rgba(0, 0, 0, 0.03);
-    color: #1a1a1a;
-    border-color: rgba(0, 0, 0, 0.12);
-
-    &::placeholder {
-      color: rgba(0, 0, 0, 0.4);
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.15);
-    }
-  }
-
-  .cancel {
-    color: rgba(0, 0, 0, 0.5);
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.06);
-      color: rgba(0, 0, 0, 0.75);
-    }
-  }
-
-  .deleteButton {
-    color: rgba(0, 0, 0, 0.4);
-
-    &:hover {
-      background-color: color-mix(
-        in srgb,
-        var(--agentation-color-red) 25%,
-        transparent
-      );
-      color: var(--agentation-color-red);
-    }
   }
 }

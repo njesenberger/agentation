@@ -88,6 +88,9 @@ import styles from "./styles.module.scss";
 import { generateOutput } from "../../utils/generate-output";
 import { AnnotationMarker, ExitingMarker, PendingMarker } from "./annotation-marker";
 import { SettingsPanel } from "./settings-panel";
+import { Toolbar } from "../toolbar";
+import { ToolbarButton, ToolbarButtonProps } from "../toolbar/toolbar-button";
+import { ToolbarButtonsContainer } from "../toolbar/toolbar-buttons-container";
 
 /**
  * Composes element identification with React component detection.
@@ -3236,7 +3239,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
         // Constrain to viewport
         const padding = 20;
-        const wrapperWidth = 337; // .toolbar wrapper width
+        const wrapperWidth = 333; // .toolbar wrapper width
         const toolbarHeight = 44;
 
         // Content is right-aligned within wrapper via margin-left: auto
@@ -3321,7 +3324,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
     const constrainPosition = () => {
       const padding = 20;
-      const wrapperWidth = 337; // .toolbar wrapper width
+      const wrapperWidth = 333; // .toolbar wrapper width
       const toolbarHeight = 44;
 
       let newX = toolbarPosition.x;
@@ -3562,13 +3565,97 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     return styles;
   };
 
+  // const toolbarButtons: ToolbarButtonProps[] = [
+  //   {
+  //     title: isFrozen ? "Resume animations" : "Pause animations",
+  //     shortcut: "P",
+  //     icon: <IconPausePlayAnimated size={24} isPaused={false} />,
+  //     activeIcon: <IconPausePlayAnimated size={24} isPaused={true} />,
+  //     active: isFrozen,
+  //     onClick: () => {
+  //       hideTooltipsUntilMouseLeave();
+  //       toggleFreeze();
+  //     },
+  //   },
+  //   {
+  //     title: isDesignMode ? "Exit layout mode" : "Layout mode",
+  //     shortcut: "L",
+  //     icon: <IconLayout />,
+  //     active: isDesignMode,
+  //     onClick: () => {
+  //       hideTooltipsUntilMouseLeave();
+  //       if (isDrawMode) setIsDrawMode(false);
+  //       if (showSettings) setShowSettings(false);
+  //       if (pendingAnnotation) cancelAnnotation();
+  //       isDesignMode ? closeDesignMode() : setIsDesignMode(true);
+  //     },
+  //   },
+  //   {
+  //     title: showMarkers ? "Hide markers" : "Show markers",
+  //     shortcut: "H",
+  //     icon: <IconEyeAnimated size={24} isOpen={showMarkers} />,
+  //     disabled: !hasAnnotations || isDesignMode,
+  //     onClick: () => {
+  //       hideTooltipsUntilMouseLeave();
+  //       setShowMarkers(!showMarkers);
+  //     },
+  //   },
+  //   {
+  //     title: isDesignMode && blankCanvas ? "Copy layout" : "Copy feedback",
+  //     shortcut: "C",
+  //     icon: <IconCopyAnimated size={24} copied={false} />,
+  //     activeIcon: <IconCopyAnimated size={24} copied={true} />,
+  //     active: copied,
+  //     disabled:
+  //       !hasAnnotations &&
+  //       drawStrokes.length === 0 &&
+  //       designPlacements.length === 0,
+  //     onClick: copyOutput,
+  //   },
+  //   {
+  //     title: "Send Annotations",
+  //     shortcut: "S",
+  //     icon: <IconSendArrow size={24} state="idle" />,
+  //     successIcon: <IconSendArrow size={24} state="sent" />,
+  //     errorIcon: <IconSendArrow size={24} state="failed" />,
+  //     hidden: !(
+  //       !settings.webhooksEnabled &&
+  //       isValidUrl(settings.webhookUrl || webhookUrl || "")
+  //     ),
+  //     disabled: !hasAnnotations || sendState === "sending",
+  //     onClick: sendToWebhook,
+  //   },
+  //   {
+  //     title: "Clear all",
+  //     shortcut: "X",
+  //     icon: <IconTrashAlt size={24} />,
+  //     disabled:
+  //       !hasAnnotations &&
+  //       drawStrokes.length === 0 &&
+  //       designPlacements.length === 0,
+  //     onClick: clearAll,
+  //   },
+  //   {
+  //     title: "Settings",
+  //     icon: <IconGear size={24} />,
+  //     onClick: () => {
+  //       hideTooltipsUntilMouseLeave();
+  //       if (isDesignMode) closeDesignMode();
+  //       setShowSettings(!showSettings);
+  //     },
+  //   },
+  // ];
+
   return createPortal(
-    <div ref={portalWrapperRef} style={{ display: "contents" }} data-agentation-theme={isDarkMode ? "dark" : "light"} data-agentation-accent={settings.annotationColorId} data-agentation-root="">
+    <div
+      ref={portalWrapperRef}
+      style={{ display: "contents" }}
+      data-agentation-theme={isDarkMode ? "dark" : "light"}
+      data-agentation-accent={settings.annotationColorId}
+      data-agentation-root=""
+    >
       {/* Toolbar */}
-      <div
-        className={`${styles.toolbar}${userClassName ? ` ${userClassName}` : ""}`}
-        data-feedback-toolbar
-        data-agentation-toolbar
+      <Toolbar
         style={
           toolbarPosition
             ? {
@@ -3579,33 +3666,256 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               }
             : undefined
         }
+        open={isActive}
+        onOpenChange={setIsActive}
       >
-        {/* Morphing container */}
+        <DesignPalette
+          visible={isDesignMode && isActive}
+          activeType={activeDesignComponent}
+          onSelect={(type) => {
+            setActiveDesignComponent(
+              activeDesignComponent === type ? null : type,
+            );
+          }}
+          isDarkMode={isDarkMode}
+          sectionCount={rearrangeState?.sections.length ?? 0}
+          onDetectSections={() => {
+            const sections = detectPageSections();
+            const existing = rearrangeState?.sections ?? [];
+            const existingSelectors = new Set(existing.map((s) => s.selector));
+            const newSections = sections.filter(
+              (s) => !existingSelectors.has(s.selector),
+            );
+            const merged = [...existing, ...newSections];
+            const mergedOrder = [
+              ...(rearrangeState?.originalOrder ?? []),
+              ...newSections.map((s) => s.id),
+            ];
+            setRearrangeState({
+              sections: merged,
+              originalOrder: mergedOrder,
+              detectedAt: Date.now(),
+            });
+          }}
+          placementCount={designPlacements.length}
+          onClearPlacements={() => {
+            // Animate placements and rearrange sections out, then clear
+            setDesignClearSignal((n) => n + 1);
+            setRearrangeClearSignal((n) => n + 1);
+            originalSetTimeout(() => {
+              setRearrangeState({
+                sections: [],
+                originalOrder: [],
+                detectedAt: Date.now(),
+              });
+            }, 200);
+          }}
+          blankCanvas={blankCanvas}
+          onBlankCanvasChange={(on) => {
+            const emptyRearrange = {
+              sections: [],
+              originalOrder: [],
+              detectedAt: Date.now(),
+            };
+            if (on) {
+              // Entering wireframe: stash all explore state, restore wireframe state
+              exploreStashRef.current = {
+                rearrange: rearrangeState,
+                placements: designPlacements,
+              };
+              setRearrangeState(
+                wireframeStashRef.current.rearrange || emptyRearrange,
+              );
+              setDesignPlacements(wireframeStashRef.current.placements);
+              setActiveDesignComponent(null);
+            } else {
+              // Leaving wireframe: stash all wireframe state, restore explore state
+              wireframeStashRef.current = {
+                rearrange: rearrangeState,
+                placements: designPlacements,
+              };
+              setRearrangeState(
+                exploreStashRef.current.rearrange || emptyRearrange,
+              );
+              setDesignPlacements(exploreStashRef.current.placements);
+            }
+            setBlankCanvas(on);
+          }}
+          wireframePurpose={wireframePurpose}
+          onWireframePurposeChange={setWireframePurpose}
+          Tooltip={HelpTooltip}
+          onDragStart={(type, e) => {
+            e.preventDefault();
+            const def = DEFAULT_SIZES[type];
+            let preview: HTMLDivElement | null = null;
+            let didDrag = false;
+            const startX = e.clientX;
+            const startY = e.clientY;
+
+            // Find toolbar bottom for distance-based scaling
+            const toolbar = (e.target as HTMLElement).closest(
+              "[data-feedback-toolbar]",
+            );
+            const toolbarTop =
+              toolbar?.getBoundingClientRect().top ?? window.innerHeight;
+
+            const onMove = (ev: MouseEvent) => {
+              const dx = ev.clientX - startX;
+              const dy = ev.clientY - startY;
+
+              if (!didDrag && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+                didDrag = true;
+                preview = document.createElement("div");
+                preview.className = `${designStyles.dragPreview}${blankCanvas ? ` ${designStyles.dragPreviewWireframe}` : ""}`;
+                document.body.appendChild(preview);
+              }
+
+              if (!preview) return;
+
+              // Scale up as cursor moves away from toolbar
+              const dist = Math.max(0, toolbarTop - ev.clientY);
+              const progress = Math.min(1, dist / 180);
+              const eased = 1 - Math.pow(1 - progress, 2); // ease-out
+
+              const minW = 28;
+              const minH = 20;
+              const maxW = Math.min(140, def.width * 0.18);
+              const maxH = Math.min(90, def.height * 0.18);
+              const w = minW + (maxW - minW) * eased;
+              const h = minH + (maxH - minH) * eased;
+
+              preview.style.width = `${w}px`;
+              preview.style.height = `${h}px`;
+              preview.style.left = `${ev.clientX - w / 2}px`;
+              preview.style.top = `${ev.clientY - h / 2}px`;
+              preview.style.opacity = `${0.5 + 0.5 * eased}`;
+              preview.textContent = eased > 0.25 ? type : "";
+            };
+
+            const onUp = (ev: MouseEvent) => {
+              window.removeEventListener("mousemove", onMove);
+              window.removeEventListener("mouseup", onUp);
+              if (preview) document.body.removeChild(preview);
+
+              if (didDrag) {
+                const w = def.width;
+                const h = def.height;
+                const scrollY = window.scrollY;
+                const x = Math.max(0, ev.clientX - w / 2);
+                const y = Math.max(0, ev.clientY + scrollY - h / 2);
+                const placement: DesignPlacement = {
+                  id: `dp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                  type,
+                  x,
+                  y,
+                  width: w,
+                  height: h,
+                  scrollY,
+                  timestamp: Date.now(),
+                };
+                setDesignPlacements((prev) => [...prev, placement]);
+                setActiveDesignComponent(null);
+                // Deselect any previously selected placements
+                designSelectedIdsRef.current = new Set();
+                setDesignDeselectSignal((n) => n + 1);
+              }
+            };
+
+            window.addEventListener("mousemove", onMove);
+            window.addEventListener("mouseup", onUp);
+          }}
+        />
+        <SettingsPanel
+          settings={settings}
+          onSettingsChange={(patch) => setSettings((s) => ({ ...s, ...patch }))}
+          isDarkMode={isDarkMode}
+          onToggleTheme={toggleTheme}
+          isDevMode={isDevMode}
+          connectionStatus={connectionStatus}
+          endpoint={endpoint}
+          isVisible={showSettingsVisible}
+          toolbarNearBottom={!!toolbarPosition && toolbarPosition.y < 230}
+          settingsPage={settingsPage}
+          onSettingsPageChange={setSettingsPage}
+          onHideToolbar={hideToolbarTemporarily}
+        />
+        <ToolbarButtonsContainer>
+          <ToolbarButton
+            title={isFrozen ? "Resume animations" : "Pause animations"}
+            icon={<IconPausePlayAnimated size={24} isPaused={isFrozen} />}
+            active={isFrozen}
+            onClick={toggleFreeze}
+          />
+          <ToolbarButton
+            title={isDesignMode ? "Exit layout mode" : "Layout mode"}
+            icon={<IconLayout />}
+            active={isDesignMode}
+            onClick={() =>
+              isDesignMode ? closeDesignMode() : setIsDesignMode(true)
+            }
+          />
+          <ToolbarButton
+            title={showMarkers ? "Hide markers" : "Show markers"}
+            icon={<IconEyeAnimated size={24} isOpen={showMarkers} />}
+            disabled={!hasAnnotations || isDesignMode}
+            onClick={() => setShowMarkers(!showMarkers)}
+          />
+          <ToolbarButton
+            title="Clear all"
+            icon={<IconTrashAlt size={24} />}
+            disabled={!hasAnnotations}
+            onClick={clearAll}
+          />
+          <ToolbarButton
+            title="Settings"
+            icon={<IconGear size={24} />}
+            onClick={() => setShowSettings(!showSettings)}
+          />
+        </ToolbarButtonsContainer>
+      </Toolbar>
+      {false && (
         <div
-          className={`${styles.toolbarContainer} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
-          onClick={
-            !isActive
-              ? (e) => {
-                  // Don't activate if we just finished dragging
-                  if (justFinishedToolbarDragRef.current) {
-                    justFinishedToolbarDragRef.current = false;
-                    e.preventDefault();
-                    return;
-                  }
-                  setIsActive(true);
+          className={`${styles.toolbar}${userClassName ? ` ${userClassName}` : ""}`}
+          data-feedback-toolbar
+          style={
+            toolbarPosition
+              ? {
+                  left: toolbarPosition.x,
+                  top: toolbarPosition.y,
+                  right: "auto",
+                  bottom: "auto",
                 }
               : undefined
           }
-          onMouseDown={handleToolbarMouseDown}
-          role={!isActive ? "button" : undefined}
-          tabIndex={!isActive ? 0 : -1}
-          title={!isActive ? "Start feedback mode" : undefined}
         >
-          {/* Toggle content - visible when collapsed */}
+          {/* Morphing container */}
           <div
-            className={`${styles.toggleContent} ${!isActive ? styles.visible : styles.hidden}`}
+            className={`${styles.toolbarContainer} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
+            onClick={
+              !isActive
+                ? (e) => {
+                    // Don't activate if we just finished dragging
+                    if (justFinishedToolbarDragRef.current) {
+                      justFinishedToolbarDragRef.current = false;
+                      e.preventDefault();
+                      return;
+                    }
+                    setIsActive(true);
+                  }
+                : undefined
+            }
+            onMouseDown={handleToolbarMouseDown}
+            role={!isActive ? "button" : undefined}
+            tabIndex={!isActive ? 0 : -1}
+            title={!isActive ? "Start feedback mode" : undefined}
           >
-            <IconListSparkle size={24} />
+            {/* Toggle content - visible when collapsed */}
+            <div
+              className={`${styles.toggleContent} ${!isActive ? styles.visible : styles.hidden}`}
+            >
+              <IconListSparkle size={24} />
+            </div>
+
             {hasVisibleAnnotations && (
               <span
                 className={`${styles.badge} ${isActive ? styles.fadeOut : ""} ${showEntranceAnimation ? styles.entrance : ""}`}
@@ -3613,43 +3923,42 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                 {visibleAnnotations.length}
               </span>
             )}
-          </div>
 
-          {/* Controls content - visible when expanded */}
-          <div
-            className={`${styles.controlsContent} ${isActive ? styles.visible : styles.hidden} ${
-              toolbarPosition && toolbarPosition.y < 100
-                ? styles.tooltipBelow
-                : ""
-            } ${tooltipsHidden || showSettings ? styles.tooltipsHidden : ""} ${tooltipSessionActive ? styles.tooltipsInSession : ""}`}
-            onMouseEnter={handleControlsMouseEnter}
-            onMouseLeave={handleControlsMouseLeave}
-          >
+            {/* Controls content - visible when expanded */}
             <div
-              className={`${styles.buttonWrapper} ${
-                toolbarPosition && toolbarPosition.x < 120
-                  ? styles.buttonWrapperAlignLeft
+              className={`${styles.controlsContent} ${isActive ? styles.visible : styles.hidden} ${
+                toolbarPosition && toolbarPosition.y < 100
+                  ? styles.tooltipBelow
                   : ""
-              }`}
+              } ${tooltipsHidden || showSettings || isDesignMode ? styles.tooltipsHidden : ""} ${tooltipSessionActive ? styles.tooltipsInSession : ""}`}
+              onMouseEnter={handleControlsMouseEnter}
+              onMouseLeave={handleControlsMouseLeave}
             >
-              <button
-                className={styles.controlButton}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  toggleFreeze();
-                }}
-                data-active={isFrozen}
+              <div
+                className={`${styles.buttonWrapper} ${
+                  toolbarPosition && toolbarPosition.x < 120
+                    ? styles.buttonWrapperAlignLeft
+                    : ""
+                }`}
               >
-                <IconPausePlayAnimated size={24} isPaused={isFrozen} />
-              </button>
-              <span className={styles.buttonTooltip}>
-                {isFrozen ? "Resume animations" : "Pause animations"}
-                <span className={styles.shortcut}>P</span>
-              </span>
-            </div>
+                <button
+                  className={styles.controlButton}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    hideTooltipsUntilMouseLeave();
+                    toggleFreeze();
+                  }}
+                  data-active={isFrozen}
+                >
+                  <IconPausePlayAnimated size={24} isPaused={isFrozen} />
+                </button>
+                <span className={styles.buttonTooltip}>
+                  {isFrozen ? "Resume animations" : "Pause animations"}
+                  <span className={styles.shortcut}>P</span>
+                </span>
+              </div>
 
-            {/* Draw mode disabled for now
+              {/* Draw mode disabled for now
             <div className={styles.buttonWrapper}>
               <button
                 className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
@@ -3670,201 +3979,237 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             </div>
             */}
 
-            <div className={styles.buttonWrapper}>
-              <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  if (isDrawMode) setIsDrawMode(false);
-                  if (showSettings) setShowSettings(false);
-                  if (pendingAnnotation) cancelAnnotation();
-                  if (isDesignMode) {
-                    closeDesignMode();
-                  } else {
-                    setIsDesignMode(true);
+              <div className={styles.buttonWrapper}>
+                <button
+                  className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    hideTooltipsUntilMouseLeave();
+                    if (isDrawMode) setIsDrawMode(false);
+                    if (showSettings) setShowSettings(false);
+                    if (pendingAnnotation) cancelAnnotation();
+                    if (isDesignMode) {
+                      closeDesignMode();
+                    } else {
+                      setIsDesignMode(true);
+                    }
+                  }}
+                  data-active={isDesignMode}
+                  style={
+                    isDesignMode && blankCanvas
+                      ? {
+                          color: "#f97316",
+                          background: "rgba(249, 115, 22, 0.25)",
+                        }
+                      : undefined
                   }
-                }}
-                data-active={isDesignMode}
-                style={isDesignMode && blankCanvas ? { color: '#f97316', background: 'rgba(249, 115, 22, 0.25)' } : undefined}
-              >
-                <IconLayout size={21} />
-              </button>
-              <span className={styles.buttonTooltip}>
-                {isDesignMode ? "Exit layout mode" : "Layout mode"}
-                <span className={styles.shortcut}>L</span>
-              </span>
-            </div>
+                >
+                  <IconLayout />
+                </button>
+                <span className={styles.buttonTooltip}>
+                  {isDesignMode ? "Exit layout mode" : "Layout mode"}
+                  <span className={styles.shortcut}>L</span>
+                </span>
+              </div>
 
-            <div className={styles.buttonWrapper}>
-              <button
-                className={styles.controlButton}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  setShowMarkers(!showMarkers);
-                }}
-                disabled={!hasAnnotations || isDesignMode}
-              >
-                <IconEyeAnimated size={24} isOpen={showMarkers} />
-              </button>
-              <span className={styles.buttonTooltip}>
-                {showMarkers ? "Hide markers" : "Show markers"}
-                <span className={styles.shortcut}>H</span>
-              </span>
-            </div>
+              <div className={styles.buttonWrapper}>
+                <button
+                  className={styles.controlButton}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    hideTooltipsUntilMouseLeave();
+                    setShowMarkers(!showMarkers);
+                  }}
+                  disabled={!hasAnnotations || isDesignMode}
+                >
+                  <IconEyeAnimated size={24} isOpen={showMarkers} />
+                </button>
+                <span className={styles.buttonTooltip}>
+                  {showMarkers ? "Hide markers" : "Show markers"}
+                  <span className={styles.shortcut}>H</span>
+                </span>
+              </div>
 
-            <div className={styles.buttonWrapper}>
-              <button
-                className={`${styles.controlButton} ${copied ? styles.statusShowing : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  copyOutput();
-                }}
-                disabled={isDesignMode && blankCanvas
-                  ? designPlacements.length === 0 && !(rearrangeState?.sections?.length)
-                  : !hasAnnotations && drawStrokes.length === 0 && designPlacements.length === 0 && !(rearrangeState?.sections?.length)}
-                data-active={copied}
-              >
-                <IconCopyAnimated size={24} copied={copied} tint={isDesignMode && blankCanvas && (designPlacements.length > 0 || !!(rearrangeState?.sections?.length)) ? "#f97316" : undefined} />
-              </button>
-              <span className={styles.buttonTooltip}>
-                {isDesignMode && blankCanvas ? "Copy layout" : "Copy feedback"}
-                <span className={styles.shortcut}>C</span>
-              </span>
-            </div>
+              <div className={styles.buttonWrapper}>
+                <button
+                  className={`${styles.controlButton} ${copied ? styles.statusShowing : ""}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    hideTooltipsUntilMouseLeave();
+                    copyOutput();
+                  }}
+                  disabled={
+                    isDesignMode && blankCanvas
+                      ? designPlacements.length === 0 &&
+                        !rearrangeState?.sections?.length
+                      : !hasAnnotations &&
+                        drawStrokes.length === 0 &&
+                        designPlacements.length === 0 &&
+                        !rearrangeState?.sections?.length
+                  }
+                  data-active={copied}
+                >
+                  <IconCopyAnimated
+                    size={24}
+                    copied={copied}
+                    tint={
+                      isDesignMode &&
+                      blankCanvas &&
+                      (designPlacements.length > 0 ||
+                        !!rearrangeState?.sections?.length)
+                        ? "#f97316"
+                        : undefined
+                    }
+                  />
+                </button>
+                <span className={styles.buttonTooltip}>
+                  {isDesignMode && blankCanvas
+                    ? "Copy layout"
+                    : "Copy feedback"}
+                  <span className={styles.shortcut}>C</span>
+                </span>
+              </div>
 
-            {/* Send button - only visible when webhook URL is available AND auto-send is off */}
-            <div
-              className={`${styles.buttonWrapper} ${styles.sendButtonWrapper} ${isActive && !settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.sendButtonVisible : ""}`}
-            >
-              <button
-                className={`${styles.controlButton} ${sendState === "sent" || sendState === "failed" ? styles.statusShowing : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  sendToWebhook();
-                }}
-                disabled={
-                  !hasAnnotations ||
-                  (!isValidUrl(settings.webhookUrl) &&
-                    !isValidUrl(webhookUrl || "")) ||
-                  sendState === "sending"
-                }
-                data-no-hover={sendState === "sent" || sendState === "failed"}
-                tabIndex={
-                  isValidUrl(settings.webhookUrl) ||
-                  isValidUrl(webhookUrl || "")
-                    ? 0
-                    : -1
-                }
+              {/* Send button - only visible when webhook URL is available AND auto-send is off */}
+              <div
+                className={`${styles.buttonWrapper} ${styles.sendButtonWrapper} ${isActive && !settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.sendButtonVisible : ""}`}
               >
-                <IconSendArrow size={24} state={sendState} />
-                {hasAnnotations && sendState === "idle" && (
+                <button
+                  className={`${styles.controlButton} ${sendState === "sent" || sendState === "failed" ? styles.statusShowing : ""}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    hideTooltipsUntilMouseLeave();
+                    sendToWebhook();
+                  }}
+                  disabled={
+                    !hasAnnotations ||
+                    (!isValidUrl(settings.webhookUrl) &&
+                      !isValidUrl(webhookUrl || "")) ||
+                    sendState === "sending"
+                  }
+                  data-no-hover={sendState === "sent" || sendState === "failed"}
+                  tabIndex={
+                    isValidUrl(settings.webhookUrl) ||
+                    isValidUrl(webhookUrl || "")
+                      ? 0
+                      : -1
+                  }
+                >
+                  <IconSendArrow size={24} state={sendState} />
+                  {hasAnnotations && sendState === "idle" && (
+                    <span className={styles.buttonBadge}>
+                      {annotations.length}
+                    </span>
+                  )}
+                </button>
+                <span className={styles.buttonTooltip}>
+                  Send Annotations
+                  <span className={styles.shortcut}>S</span>
+                </span>
+              </div>
+
+              <div className={styles.buttonWrapper}>
+                <button
+                  className={styles.controlButton}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    hideTooltipsUntilMouseLeave();
+                    clearAll();
+                  }}
+                  disabled={
+                    !hasAnnotations &&
+                    drawStrokes.length === 0 &&
+                    designPlacements.length === 0 &&
+                    !rearrangeState?.sections?.length
+                  }
+                  data-danger
+                >
+                  <IconTrashAlt size={24} />
+                </button>
+                <span className={styles.buttonTooltip}>
+                  Clear all
+                  <span className={styles.shortcut}>X</span>
+                </span>
+              </div>
+
+              <div className={styles.buttonWrapper}>
+                <button
+                  className={styles.controlButton}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    hideTooltipsUntilMouseLeave();
+                    if (isDesignMode) closeDesignMode();
+                    setShowSettings(!showSettings);
+                  }}
+                >
+                  <IconGear size={24} />
+                </button>
+                {endpoint && connectionStatus !== "disconnected" && (
                   <span
-                    className={styles.buttonBadge}
-                  >
-                    {annotations.length}
-                  </span>
+                    className={`${styles.mcpIndicator} ${styles[connectionStatus]} ${showSettings ? styles.hidden : ""}`}
+                    title={
+                      connectionStatus === "connected"
+                        ? "MCP Connected"
+                        : "MCP Connecting…"
+                    }
+                  />
                 )}
-              </button>
-              <span className={styles.buttonTooltip}>
-                Send Annotations
-                <span className={styles.shortcut}>S</span>
-              </span>
-            </div>
+                <span className={styles.buttonTooltip}>Settings</span>
+              </div>
 
-            <div className={styles.buttonWrapper}>
-              <button
-                className={styles.controlButton}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  clearAll();
-                }}
-                disabled={!hasAnnotations && drawStrokes.length === 0 && designPlacements.length === 0 && !(rearrangeState?.sections?.length)}
-                data-danger
+              <div className={styles.divider} />
+
+              <div
+                className={`${styles.buttonWrapper} ${
+                  toolbarPosition &&
+                  typeof window !== "undefined" &&
+                  toolbarPosition.x > window.innerWidth - 120
+                    ? styles.buttonWrapperAlignRight
+                    : ""
+                }`}
               >
-                <IconTrashAlt size={24} />
-              </button>
-              <span className={styles.buttonTooltip}>
-                Clear all
-                <span className={styles.shortcut}>X</span>
-              </span>
+                <button
+                  className={styles.controlButton}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    hideTooltipsUntilMouseLeave();
+                    deactivate();
+                  }}
+                >
+                  <IconXmarkLarge size={24} />
+                </button>
+                <span className={styles.buttonTooltip}>
+                  Exit
+                  <span className={styles.shortcut}>Esc</span>
+                </span>
+              </div>
             </div>
 
-            <div className={styles.buttonWrapper}>
-              <button
-                className={styles.controlButton}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  if (isDesignMode) closeDesignMode();
-                  setShowSettings(!showSettings);
-                }}
-              >
-                <IconGear size={24} />
-              </button>
-              {endpoint && connectionStatus !== "disconnected" && (
-                <span
-                  className={`${styles.mcpIndicator} ${styles[connectionStatus]} ${showSettings ? styles.hidden : ""}`}
-                  title={
-                    connectionStatus === "connected"
-                      ? "MCP Connected"
-                      : "MCP Connecting..."
-                  }
-                />
-              )}
-              <span className={styles.buttonTooltip}>Settings</span>
-            </div>
-
-            <div
-              className={styles.divider}
-            />
-
-            <div
-              className={`${styles.buttonWrapper} ${
-                toolbarPosition &&
-                typeof window !== "undefined" &&
-                toolbarPosition.x > window.innerWidth - 120
-                  ? styles.buttonWrapperAlignRight
-                  : ""
-              }`}
-            >
-              <button
-                className={styles.controlButton}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  deactivate();
-                }}
-              >
-                <IconXmarkLarge size={24} />
-              </button>
-              <span className={styles.buttonTooltip}>
-                Exit
-                <span className={styles.shortcut}>Esc</span>
-              </span>
-            </div>
-          </div>
-
-          {/* Layout Mode Palette */}
+            {/* Layout Mode Palette */}
             <DesignPalette
               visible={isDesignMode && isActive}
               activeType={activeDesignComponent}
               onSelect={(type) => {
-                setActiveDesignComponent(activeDesignComponent === type ? null : type);
+                setActiveDesignComponent(
+                  activeDesignComponent === type ? null : type,
+                );
               }}
               isDarkMode={isDarkMode}
               sectionCount={rearrangeState?.sections.length ?? 0}
               onDetectSections={() => {
                 const sections = detectPageSections();
                 const existing = rearrangeState?.sections ?? [];
-                const existingSelectors = new Set(existing.map(s => s.selector));
-                const newSections = sections.filter(s => !existingSelectors.has(s.selector));
+                const existingSelectors = new Set(
+                  existing.map((s) => s.selector),
+                );
+                const newSections = sections.filter(
+                  (s) => !existingSelectors.has(s.selector),
+                );
                 const merged = [...existing, ...newSections];
-                const mergedOrder = [...(rearrangeState?.originalOrder ?? []), ...newSections.map(s => s.id)];
+                const mergedOrder = [
+                  ...(rearrangeState?.originalOrder ?? []),
+                  ...newSections.map((s) => s.id),
+                ];
                 setRearrangeState({
                   sections: merged,
                   originalOrder: mergedOrder,
@@ -3874,8 +4219,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               placementCount={designPlacements.length}
               onClearPlacements={() => {
                 // Animate placements and rearrange sections out, then clear
-                setDesignClearSignal(n => n + 1);
-                setRearrangeClearSignal(n => n + 1);
+                setDesignClearSignal((n) => n + 1);
+                setRearrangeClearSignal((n) => n + 1);
                 originalSetTimeout(() => {
                   setRearrangeState({
                     sections: [],
@@ -3886,17 +4231,31 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               }}
               blankCanvas={blankCanvas}
               onBlankCanvasChange={(on) => {
-                const emptyRearrange = { sections: [], originalOrder: [], detectedAt: Date.now() };
+                const emptyRearrange = {
+                  sections: [],
+                  originalOrder: [],
+                  detectedAt: Date.now(),
+                };
                 if (on) {
                   // Entering wireframe: stash all explore state, restore wireframe state
-                  exploreStashRef.current = { rearrange: rearrangeState, placements: designPlacements };
-                  setRearrangeState(wireframeStashRef.current.rearrange || emptyRearrange);
+                  exploreStashRef.current = {
+                    rearrange: rearrangeState,
+                    placements: designPlacements,
+                  };
+                  setRearrangeState(
+                    wireframeStashRef.current.rearrange || emptyRearrange,
+                  );
                   setDesignPlacements(wireframeStashRef.current.placements);
                   setActiveDesignComponent(null);
                 } else {
                   // Leaving wireframe: stash all wireframe state, restore explore state
-                  wireframeStashRef.current = { rearrange: rearrangeState, placements: designPlacements };
-                  setRearrangeState(exploreStashRef.current.rearrange || emptyRearrange);
+                  wireframeStashRef.current = {
+                    rearrange: rearrangeState,
+                    placements: designPlacements,
+                  };
+                  setRearrangeState(
+                    exploreStashRef.current.rearrange || emptyRearrange,
+                  );
                   setDesignPlacements(exploreStashRef.current.placements);
                 }
                 setBlankCanvas(on);
@@ -3913,8 +4272,11 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                 const startY = e.clientY;
 
                 // Find toolbar bottom for distance-based scaling
-                const toolbar = (e.target as HTMLElement).closest("[data-feedback-toolbar]");
-                const toolbarTop = toolbar?.getBoundingClientRect().top ?? window.innerHeight;
+                const toolbar = (e.target as HTMLElement).closest(
+                  "[data-feedback-toolbar]",
+                );
+                const toolbarTop =
+                  toolbar?.getBoundingClientRect().top ?? window.innerHeight;
 
                 const onMove = (ev: MouseEvent) => {
                   const dx = ev.clientX - startX;
@@ -3974,7 +4336,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                     setActiveDesignComponent(null);
                     // Deselect any previously selected placements
                     designSelectedIdsRef.current = new Set();
-                    setDesignDeselectSignal(n => n + 1);
+                    setDesignDeselectSignal((n) => n + 1);
                   }
                 };
 
@@ -3983,28 +4345,31 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               }}
             />
 
-          <SettingsPanel
-            settings={settings}
-            onSettingsChange={(patch) => setSettings((s) => ({ ...s, ...patch }))}
-            isDarkMode={isDarkMode}
-            onToggleTheme={toggleTheme}
-            isDevMode={isDevMode}
-            connectionStatus={connectionStatus}
-            endpoint={endpoint}
-            isVisible={showSettingsVisible}
-            toolbarNearBottom={!!toolbarPosition && toolbarPosition.y < 230}
-            settingsPage={settingsPage}
-            onSettingsPageChange={setSettingsPage}
-            onHideToolbar={hideToolbarTemporarily}
-          />
+            <SettingsPanel
+              settings={settings}
+              onSettingsChange={(patch) =>
+                setSettings((s) => ({ ...s, ...patch }))
+              }
+              isDarkMode={isDarkMode}
+              onToggleTheme={toggleTheme}
+              isDevMode={isDevMode}
+              connectionStatus={connectionStatus}
+              endpoint={endpoint}
+              isVisible={showSettingsVisible}
+              toolbarNearBottom={!!toolbarPosition && toolbarPosition.y < 230}
+              settingsPage={settingsPage}
+              onSettingsPageChange={setSettingsPage}
+              onHideToolbar={hideToolbarTemporarily}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Blank canvas backdrop — stays mounted so opacity transition works on open/close */}
       {(isDesignMode || designOverlayExiting) && (
         <div
           className={`${designStyles.blankCanvas} ${canvasReady ? designStyles.visible : ""} ${designInteracting ? designStyles.gridActive : ""}`}
-          style={{ '--canvas-opacity': canvasOpacity } as React.CSSProperties}
+          style={{ "--canvas-opacity": canvasOpacity } as React.CSSProperties}
           data-feedback-toolbar
         />
       )}
@@ -4013,7 +4378,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       {isDesignMode && blankCanvas && canvasReady && (
         <div className={designStyles.wireframeNotice} data-feedback-toolbar>
           <div className={designStyles.wireframeOpacityRow}>
-            <span className={designStyles.wireframeOpacityLabel}>Toggle Opacity</span>
+            <span className={designStyles.wireframeOpacityLabel}>
+              Toggle Opacity
+            </span>
             <input
               type="range"
               className={designStyles.wireframeOpacitySlider}
@@ -4025,13 +4392,19 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             />
           </div>
           <div className={designStyles.wireframeNoticeTitleRow}>
-            <span className={designStyles.wireframeNoticeTitle}>Wireframe Mode</span>
+            <span className={designStyles.wireframeNoticeTitle}>
+              Wireframe Mode
+            </span>
             <span className={designStyles.wireframeNoticeDivider} />
             <button
               className={designStyles.wireframeStartOver}
               onClick={() => {
-                setDesignClearSignal(n => n + 1);
-                setRearrangeState({ sections: [], originalOrder: [], detectedAt: Date.now() });
+                setDesignClearSignal((n) => n + 1);
+                setRearrangeState({
+                  sections: [],
+                  originalOrder: [],
+                  detectedAt: Date.now(),
+                });
                 wireframeStashRef.current = { rearrange: null, placements: [] };
                 setWireframePurpose("");
                 clearWireframeState(pathname);
@@ -4040,7 +4413,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               Start Over
             </button>
           </div>
-          Drag components onto the canvas.<br />Copied output will only include the wireframed layout.
+          Drag components onto the canvas.
+          <br />
+          Copied output will only include the wireframed layout.
         </div>
       )}
 
@@ -4055,7 +4430,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
           exiting={designOverlayExiting}
           onInteractionChange={setDesignInteracting}
           passthrough={!activeDesignComponent}
-          extraSnapRects={rearrangeState?.sections.map(s => s.currentRect)}
+          extraSnapRects={rearrangeState?.sections.map((s) => s.currentRect)}
           deselectSignal={designDeselectSignal}
           clearSignal={designClearSignal}
           wireframe={blankCanvas}
@@ -4063,7 +4438,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             designSelectedIdsRef.current = ids;
             if (!isShift) {
               rearrangeSelectedIdsRef.current = new Set();
-              setRearrangeDeselectSignal(n => n + 1);
+              setRearrangeDeselectSignal((n) => n + 1);
             }
           }}
           onDragMove={(dx, dy) => {
@@ -4075,7 +4450,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               crossDragStartRef.current = new Map();
               for (const s of rearrangeState.sections) {
                 if (selIds.has(s.id)) {
-                  crossDragStartRef.current.set(s.id, { x: s.currentRect.x, y: s.currentRect.y });
+                  crossDragStartRef.current.set(s.id, {
+                    x: s.currentRect.x,
+                    y: s.currentRect.y,
+                  });
                 }
               }
             }
@@ -4083,8 +4461,11 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               if (!selIds.has(s.id)) continue;
               const start = crossDragStartRef.current.get(s.id);
               if (!start) continue;
-              const outlineEl = document.querySelector(`[data-rearrange-section="${s.id}"]`) as HTMLElement | null;
-              if (outlineEl) outlineEl.style.transform = `translate(${dx}px, ${dy}px)`;
+              const outlineEl = document.querySelector(
+                `[data-rearrange-section="${s.id}"]`,
+              ) as HTMLElement | null;
+              if (outlineEl)
+                outlineEl.style.transform = `translate(${dx}px, ${dy}px)`;
             }
           }}
           onDragEnd={(dx, dy, committed) => {
@@ -4094,18 +4475,27 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             if (!selIds.size || !rearrangeState || !starts) return;
             // Clear outline transforms
             for (const id of selIds) {
-              const el = document.querySelector(`[data-rearrange-section="${id}"]`) as HTMLElement | null;
+              const el = document.querySelector(
+                `[data-rearrange-section="${id}"]`,
+              ) as HTMLElement | null;
               if (el) el.style.transform = "";
             }
             if (committed) {
-              setRearrangeState(prev => {
+              setRearrangeState((prev) => {
                 if (!prev) return prev;
                 return {
                   ...prev,
-                  sections: prev.sections.map(s => {
+                  sections: prev.sections.map((s) => {
                     const start = starts.get(s.id);
                     if (!start) return s;
-                    return { ...s, currentRect: { ...s.currentRect, x: Math.max(0, start.x + dx), y: Math.max(0, start.y + dy) } };
+                    return {
+                      ...s,
+                      currentRect: {
+                        ...s.currentRect,
+                        x: Math.max(0, start.x + dx),
+                        y: Math.max(0, start.y + dy),
+                      },
+                    };
                   }),
                 };
               });
@@ -4122,14 +4512,19 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
           isDarkMode={isDarkMode}
           exiting={designOverlayExiting}
           blankCanvas={blankCanvas}
-          extraSnapRects={designPlacements.map(p => ({ x: p.x, y: p.y, width: p.width, height: p.height }))}
+          extraSnapRects={designPlacements.map((p) => ({
+            x: p.x,
+            y: p.y,
+            width: p.width,
+            height: p.height,
+          }))}
           clearSignal={rearrangeClearSignal}
           deselectSignal={rearrangeDeselectSignal}
           onSelectionChange={(ids, isShift) => {
             rearrangeSelectedIdsRef.current = ids;
             if (!isShift) {
               designSelectedIdsRef.current = new Set();
-              setDesignDeselectSignal(n => n + 1);
+              setDesignDeselectSignal((n) => n + 1);
             }
           }}
           onDragMove={(dx, dy) => {
@@ -4147,7 +4542,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             }
             // Imperatively move placement divs
             for (const id of selIds) {
-              const el = document.querySelector(`[data-design-placement="${id}"]`) as HTMLElement | null;
+              const el = document.querySelector(
+                `[data-design-placement="${id}"]`,
+              ) as HTMLElement | null;
               if (el) el.style.transform = `translate(${dx}px, ${dy}px)`;
             }
           }}
@@ -4158,15 +4555,23 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             if (!selIds.size || !starts) return;
             // Clear transforms
             for (const id of selIds) {
-              const el = document.querySelector(`[data-design-placement="${id}"]`) as HTMLElement | null;
+              const el = document.querySelector(
+                `[data-design-placement="${id}"]`,
+              ) as HTMLElement | null;
               if (el) el.style.transform = "";
             }
             if (committed) {
-              setDesignPlacements(prev => prev.map(p => {
-                const start = starts.get(p.id);
-                if (!start) return p;
-                return { ...p, x: Math.max(0, start.x + dx), y: Math.max(0, start.y + dy) };
-              }));
+              setDesignPlacements((prev) =>
+                prev.map((p) => {
+                  const start = starts.get(p.id);
+                  if (!start) return p;
+                  return {
+                    ...p,
+                    x: Math.max(0, start.x + dx),
+                    y: Math.max(0, start.y + dy),
+                  };
+                }),
+              );
             }
           }}
         />
@@ -4176,7 +4581,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       <canvas
         ref={drawCanvasRef}
         className={`${styles.drawCanvas} ${isDrawMode ? styles.active : ""}`}
-        style={{ opacity: shouldShowMarkers ? 1 : 0, transition: "opacity 0.15s ease" }}
+        style={{
+          opacity: shouldShowMarkers ? 1 : 0,
+          transition: "opacity 0.15s ease",
+        }}
         data-feedback-toolbar
       />
 
@@ -4189,7 +4597,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               <AnnotationMarker
                 key={annotation.id}
                 annotation={annotation}
-                globalIndex={visibleAnnotations.findIndex((a) => a.id === annotation.id)}
+                globalIndex={visibleAnnotations.findIndex(
+                  (a) => a.id === annotation.id,
+                )}
                 layerIndex={layerIndex}
                 layerSize={arr.length}
                 isExiting={markersExiting}
@@ -4231,7 +4641,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               <AnnotationMarker
                 key={annotation.id}
                 annotation={annotation}
-                globalIndex={visibleAnnotations.findIndex((a) => a.id === annotation.id)}
+                globalIndex={visibleAnnotations.findIndex(
+                  (a) => a.id === annotation.id,
+                )}
                 layerIndex={layerIndex}
                 layerSize={arr.length}
                 isExiting={markersExiting}
@@ -4264,7 +4676,6 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             .map((a) => <ExitingMarker key={a.id} annotation={a} fixed />)}
       </div>
 
-
       {/* Interactive overlay */}
       {isActive && (
         <div
@@ -4288,8 +4699,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                   top: hoverInfo.rect.top,
                   width: hoverInfo.rect.width,
                   height: hoverInfo.rect.height,
-                  borderColor: "color-mix(in srgb, var(--agentation-color-accent) 50%, transparent)",
-                  backgroundColor: "color-mix(in srgb, var(--agentation-color-accent) 4%, transparent)",
+                  borderColor:
+                    "color-mix(in srgb, var(--agentation-color-accent) 50%, transparent)",
+                  backgroundColor:
+                    "color-mix(in srgb, var(--agentation-color-accent) 4%, transparent)",
                 }}
               />
             )}
@@ -4318,8 +4731,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                     ...(isMulti
                       ? {}
                       : {
-                          borderColor: "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
-                          backgroundColor: "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
+                          borderColor:
+                            "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
+                          backgroundColor:
+                            "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
                         }),
                   }}
                 />
@@ -4381,7 +4796,12 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                   : null;
 
               const bb = rect
-                ? { x: rect.left, y: rect.top, width: rect.width, height: rect.height }
+                ? {
+                    x: rect.left,
+                    y: rect.top,
+                    width: rect.width,
+                    height: rect.height,
+                  }
                 : {
                     x: hoveredAnnotation.boundingBox.x,
                     y: hoveredAnnotation.isFixed
@@ -4403,8 +4823,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                     ...(isMulti
                       ? {}
                       : {
-                          borderColor: "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
-                          backgroundColor: "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
+                          borderColor:
+                            "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
+                          backgroundColor:
+                            "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
                         }),
                   }}
                 />
@@ -4462,43 +4884,47 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                     })
                 : // Single element or drag multi-select: show single box
                   pendingAnnotation.targetElement &&
-                  document.contains(pendingAnnotation.targetElement)
-                    ? // Single-click: use live getBoundingClientRect for consistent positioning
-                      (() => {
-                        const rect =
-                          pendingAnnotation.targetElement!.getBoundingClientRect();
-                        return (
-                          <div
-                            className={`${styles.singleSelectOutline} ${pendingExiting ? styles.exit : styles.enter}`}
-                            style={{
-                              left: rect.left,
-                              top: rect.top,
-                              width: rect.width,
-                              height: rect.height,
-                              borderColor: "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
-                              backgroundColor: "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
-                            }}
-                          />
-                        );
-                      })()
-                    : // Drag selection or fallback: use stored boundingBox
-                      pendingAnnotation.boundingBox && (
+                    document.contains(pendingAnnotation.targetElement)
+                  ? // Single-click: use live getBoundingClientRect for consistent positioning
+                    (() => {
+                      const rect =
+                        pendingAnnotation.targetElement!.getBoundingClientRect();
+                      return (
                         <div
-                          className={`${pendingAnnotation.isMultiSelect ? styles.multiSelectOutline : styles.singleSelectOutline} ${pendingExiting ? styles.exit : styles.enter}`}
+                          className={`${styles.singleSelectOutline} ${pendingExiting ? styles.exit : styles.enter}`}
                           style={{
-                            left: pendingAnnotation.boundingBox.x,
-                            top: pendingAnnotation.boundingBox.y - scrollY,
-                            width: pendingAnnotation.boundingBox.width,
-                            height: pendingAnnotation.boundingBox.height,
-                            ...(pendingAnnotation.isMultiSelect
-                              ? {}
-                              : {
-                                  borderColor: "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
-                                  backgroundColor: "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
-                                }),
+                            left: rect.left,
+                            top: rect.top,
+                            width: rect.width,
+                            height: rect.height,
+                            borderColor:
+                              "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
+                            backgroundColor:
+                              "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
                           }}
                         />
-                      )}
+                      );
+                    })()
+                  : // Drag selection or fallback: use stored boundingBox
+                    pendingAnnotation.boundingBox && (
+                      <div
+                        className={`${pendingAnnotation.isMultiSelect ? styles.multiSelectOutline : styles.singleSelectOutline} ${pendingExiting ? styles.exit : styles.enter}`}
+                        style={{
+                          left: pendingAnnotation.boundingBox.x,
+                          top: pendingAnnotation.boundingBox.y - scrollY,
+                          width: pendingAnnotation.boundingBox.width,
+                          height: pendingAnnotation.boundingBox.height,
+                          ...(pendingAnnotation.isMultiSelect
+                            ? {}
+                            : {
+                                borderColor:
+                                  "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
+                                backgroundColor:
+                                  "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
+                              }),
+                        }}
+                      />
+                    )}
 
               {(() => {
                 // Use stored coordinates - they match what will be saved
@@ -4525,18 +4951,13 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                         pendingAnnotation.element === "Area selection"
                           ? "What should change in this area?"
                           : pendingAnnotation.isMultiSelect
-                            ? "Feedback for this group of elements..."
+                            ? "Feedback for this group of elements…"
                             : "What should change?"
                       }
                       onSubmit={addAnnotation}
                       onCancel={cancelAnnotation}
                       isExiting={pendingExiting}
-                      lightMode={!isDarkMode}
-                      accentColor={
-                        pendingAnnotation.isMultiSelect
-                          ? "var(--agentation-color-green)"
-                          : "var(--agentation-color-accent)"
-                      }
+                      isMultiSelect={pendingAnnotation.isMultiSelect}
                       style={{
                         // Popup is 280px wide, centered with translateX(-50%), so 140px each side
                         // Clamp so popup stays 20px from viewport edges
@@ -4612,7 +5033,12 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                         : null;
 
                     const bb = rect
-                      ? { x: rect.left, y: rect.top, width: rect.width, height: rect.height }
+                      ? {
+                          x: rect.left,
+                          y: rect.top,
+                          width: rect.width,
+                          height: rect.height,
+                        }
                       : editingAnnotation.boundingBox
                         ? {
                             x: editingAnnotation.boundingBox.x,
@@ -4637,8 +5063,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                           ...(editingAnnotation.isMultiSelect
                             ? {}
                             : {
-                                borderColor: "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
-                                backgroundColor: "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
+                                borderColor:
+                                  "color-mix(in srgb, var(--agentation-color-accent) 60%, transparent)",
+                                backgroundColor:
+                                  "color-mix(in srgb, var(--agentation-color-accent) 5%, transparent)",
                               }),
                         }}
                       />
@@ -4652,19 +5080,14 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                 computedStyles={parseComputedStylesString(
                   editingAnnotation.computedStyles,
                 )}
-                placeholder="Edit your feedback..."
+                placeholder="Edit your feedback…"
                 initialValue={editingAnnotation.comment}
                 submitLabel="Save"
                 onSubmit={updateAnnotation}
                 onCancel={cancelEditAnnotation}
                 onDelete={() => deleteAnnotation(editingAnnotation.id)}
                 isExiting={editExiting}
-                lightMode={!isDarkMode}
-                accentColor={
-                  editingAnnotation.isMultiSelect
-                    ? "var(--agentation-color-green)"
-                    : "var(--agentation-color-accent)"
-                }
+                isMultiSelect={editingAnnotation.isMultiSelect}
                 style={(() => {
                   const markerY = editingAnnotation.isFixed
                     ? editingAnnotation.y

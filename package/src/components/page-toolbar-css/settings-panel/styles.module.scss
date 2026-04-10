@@ -67,24 +67,27 @@
 
 .settingsPanel {
   position: absolute;
+  z-index: 1;
   right: 5px;
   bottom: calc(100% + 0.5rem);
-  z-index: 1;
-  overflow: hidden;
-  background: #1c1c1c;
   border-radius: 16px;
   padding: 12px 0;
   width: 100%;
   max-width: 253px;
   min-width: 205px;
+  background-color: #1a1a1a;
+  overflow: hidden;
+  transition: background-color 0.25s ease;
   cursor: default;
-  opacity: 1;
-  box-shadow:
-    0 1px 8px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(0, 0, 0, 0.04);
-  transition:
-    background-color 0.25s ease,
-    box-shadow 0.25s ease;
+
+  [data-agentation-theme="light"] & {
+    border-color: #fff;
+    background-color: #fff;
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.08),
+      0 4px 16px rgba(0, 0, 0, 0.06),
+      0 0 0 1px rgba(0, 0, 0, 0.04);
+  }
 
   &::before,
   &::after {
@@ -99,12 +102,12 @@
 
   &::before {
     left: 0;
-    background: linear-gradient(to right, #1c1c1c 0%, transparent 100%);
+    background: linear-gradient(to right, #1a1a1a 0%, transparent 100%);
   }
 
   &::after {
     right: 0;
-    background: linear-gradient(to left, #1c1c1c 0%, transparent 100%);
+    background: linear-gradient(to left, #1a1a1a 0%, transparent 100%);
   }
 
   .settingsHeader,
@@ -128,7 +131,6 @@
   &.enter {
     opacity: 1;
     transform: translateY(0) scale(1);
-    filter: blur(0px);
     transition:
       opacity 0.2s ease,
       transform 0.2s ease,
@@ -138,7 +140,6 @@
   &.exit {
     opacity: 0;
     transform: translateY(8px) scale(0.95);
-    filter: blur(5px);
     pointer-events: none;
     transition:
       opacity 0.1s ease,
@@ -153,7 +154,7 @@
       0 0 0 1px rgba(255, 255, 255, 0.08);
 
     .settingsLabel {
-      color: rgba(255, 255, 255, 0.6);
+      color: #fff;
     }
 
     .settingsOption {
@@ -735,12 +736,6 @@
 
 [data-agentation-theme="light"] {
   .settingsPanel {
-    background: #fff;
-    box-shadow:
-      0 2px 8px rgba(0, 0, 0, 0.08),
-      0 4px 16px rgba(0, 0, 0, 0.06),
-      0 0 0 1px rgba(0, 0, 0, 0.04);
-
     &::before {
       background: linear-gradient(to right, #fff 0%, transparent 100%);
     }
@@ -754,7 +749,7 @@
     }
 
     .settingsBrand {
-      color: #E5484D;
+      color: #e5484d;
     }
 
     .settingsVersion {
@@ -766,7 +761,7 @@
     }
 
     .settingsLabel {
-      color: rgba(0, 0, 0, 0.5);
+      color: #1a1a1a;
     }
 
     .cycleButton {

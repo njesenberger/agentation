@@ -1,0 +1,22 @@
+.toolbarWrapper {
+  position: fixed;
+  z-index: 2147483647;
+  right: 20px;
+  bottom: 20px;
+}
+
+.menuButton {
+  position: absolute;
+}
+
+.toolbar {
+  border-radius: 22px;
+  padding: 0 6px;
+  height: 44px;
+  background-color: #1a1a1a;
+  box-shadow: 0 0 0 1px red;
+
+  [data-agentation-theme="light"] & {
+    background-color: #fff;
+  }
+}
