@@ -1,5 +1,5 @@
 $toolbar-full-width: 333px;
-$toolbar-duration: 3.8s;
+$toolbar-duration: 0.33s;
 $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
 
 .toolbarWrapper {
@@ -113,6 +113,7 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
 }
 
 .toolbarMenuButtonIcon {
+  position: absolute;
   transition-property: transform, filter, opacity;
   transition-duration: $toolbar-duration;
   transition-timing-function: $toolbar-easing;
@@ -212,14 +213,13 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
   &.hidden {
     margin: 0 -3px;
     width: 0;
-    transform: scale(0);
+    transform: scale(0.25);
     opacity: 0;
   }
 }
 
 .toolbarButtonIcon {
-  flex-shrink: 0;
-  max-width: none;
+  position: absolute;
 }
 
 .toolbarButtonBadge {
