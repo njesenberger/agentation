@@ -3932,7 +3932,10 @@ export function PageFeedbackToolbarCSS({
         animationsPaused={isFrozen}
         onToggleAnimations={toggleFreeze}
         layoutModeActive={isDesignMode}
-        onToggleLayoutMode={() => setIsDesignMode(!isDesignMode)}
+        onToggleLayoutMode={() => {
+          setShowSettings(false);
+          setIsDesignMode(!isDesignMode);
+        }}
         markersVisible={showMarkers}
         onToggleMarkers={() => setShowMarkers(!showMarkers)}
         onSendFeedback={sendToWebhook}

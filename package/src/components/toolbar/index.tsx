@@ -145,7 +145,7 @@ export const Toolbar = ({
           onClick={() => onOpenChange(true)}
           type="button"
         >
-          <IconListSparkle className={styles.menuButtonIcon} />
+          <IconListSparkle className={styles.toolbarMenuButtonIcon} />
         </button>
         <div className={styles.toolbarButtonsContainer}>
           <button
@@ -174,6 +174,7 @@ export const Toolbar = ({
             className={styles.toolbarButton}
             onClick={() => {}}
             type="button"
+            disabled={!badgeCount}
           >
             <IconCopyAnimated size={24} />
           </button>
@@ -203,7 +204,7 @@ export const Toolbar = ({
             <IconTrashAlt size={24} />
           </button>
           <button
-            className={styles.toolbarButton}
+            className={`${styles.toolbarButton} ${settingsVisible ? styles.active : ""}`}
             onClick={onToggleSettings}
             type="button"
           >
