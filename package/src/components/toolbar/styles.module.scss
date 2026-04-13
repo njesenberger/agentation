@@ -1,5 +1,5 @@
 $toolbar-full-width: 333px;
-$toolbar-duration: 0.4s;
+$toolbar-duration: 3.8s;
 $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
 
 .toolbarWrapper {
@@ -157,8 +157,7 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
   width: 34px;
   height: 34px;
   color: #fff;
-  transition-property:
-    margin, width, transform, background-color, filter, opacity;
+  transition-property: margin, width, transform, background-color, opacity;
   transition-duration: $toolbar-duration;
   transition-timing-function: $toolbar-easing;
 
@@ -214,7 +213,6 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
     margin: 0 -3px;
     width: 0;
     transform: scale(0);
-    filter: blur(10px);
     opacity: 0;
   }
 }
