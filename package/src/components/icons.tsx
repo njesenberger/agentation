@@ -58,36 +58,45 @@ export const IconCheckSmall = ({ size = 14 }: { size?: number }) => (
 
 // List with sparkle icon
 export const IconListSparkle = ({
+  className = "",
   size = 24,
   style = {},
 }: {
+  className?: string;
   size?: number;
   style?: React.CSSProperties;
 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+  <svg
+    className={className}
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    style={style}
+  >
     <path
-      d="M11.5 12L5.5 12"
+      d="M5.5 6.75H18.5"
       stroke="currentColor"
       strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
-      d="M18.5 6.75L5.5 6.75"
+      d="M5.5 12H11.5"
       stroke="currentColor"
       strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
-      d="M9.25 17.25L5.5 17.25"
+      d="M5.5 17.25H9.25"
       stroke="currentColor"
       strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
-      d="M16 12.75L16.5179 13.9677C16.8078 14.6494 17.3506 15.1922 18.0323 15.4821L19.25 16L18.0323 16.5179C17.3506 16.8078 16.8078 17.3506 16.5179 18.0323L16 19.25L15.4821 18.0323C15.1922 17.3506 14.6494 16.8078 13.9677 16.5179L12.75 16L13.9677 15.4821C14.6494 15.1922 15.1922 14.6494 15.4821 13.9677L16 12.75Z"
+      d="M16 12.75L16.52 13.97C16.81 14.65 17.35 15.19 18.03 15.48L19.25 16L18.03 16.52C17.35 16.81 16.81 17.35 16.52 18.03L16 19.25L15.48 18.03C15.19 17.35 14.65 16.81 13.97 16.52L12.75 16 13.97 15.48C14.65 15.19 15.19 14.65 15.48 13.97L16 12.75Z"
       stroke="currentColor"
       strokeWidth="1.5"
       strokeLinejoin="round"
@@ -250,9 +259,11 @@ export const IconCopyAnimated = ({
 
 // Animated send arrow icon (paper plane style with checkmark/error transition)
 export const IconSendArrow = ({
+  className = "",
   size = 24,
   state = "idle",
 }: {
+  className?: string;
   size?: number;
   state?: "idle" | "sending" | "sent" | "failed";
 }) => {
@@ -262,7 +273,7 @@ export const IconSendArrow = ({
   const isSending = state === "sending";
 
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none">
       {/* Send arrow */}
       <g
         className={`${s.iconStateFast} ${showArrow ? s.visibleScaled : isSending ? s.sending : s.hiddenScaled}`}

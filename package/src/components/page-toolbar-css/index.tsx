@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -26,9 +32,17 @@ import { DesignMode } from "../design-mode";
 import { DesignPalette } from "../design-mode/palette";
 import designStyles from "../design-mode/styles.module.scss";
 import { RearrangeOverlay } from "../design-mode/rearrange";
-import { generateDesignOutput, generateRearrangeOutput } from "../design-mode/output";
+import {
+  generateDesignOutput,
+  generateRearrangeOutput,
+} from "../design-mode/output";
 import { detectPageSections } from "../design-mode/section-detection";
-import { DEFAULT_SIZES, type DesignPlacement, type ComponentType as DesignComponentType, type RearrangeState } from "../design-mode/types";
+import {
+  DEFAULT_SIZES,
+  type DesignPlacement,
+  type ComponentType as DesignComponentType,
+  type RearrangeState,
+} from "../design-mode/types";
 import {
   identifyElement,
   getNearbyText,
@@ -86,11 +100,13 @@ import {
 import type { Annotation } from "../../types";
 import styles from "./styles.module.scss";
 import { generateOutput } from "../../utils/generate-output";
-import { AnnotationMarker, ExitingMarker, PendingMarker } from "./annotation-marker";
+import {
+  AnnotationMarker,
+  ExitingMarker,
+  PendingMarker,
+} from "./annotation-marker";
 import { SettingsPanel } from "./settings-panel";
 import { Toolbar } from "../toolbar";
-import { ToolbarButton, ToolbarButtonProps } from "../toolbar/toolbar-button";
-import { ToolbarButtonsContainer } from "../toolbar/toolbar-buttons-container";
 
 /**
  * Composes element identification with React component detection.
@@ -142,7 +158,11 @@ type HoverInfo = {
   reactComponents?: string | null;
 };
 
-export type OutputDetailLevel = "compact" | "standard" | "detailed" | "forensic";
+export type OutputDetailLevel =
+  | "compact"
+  | "standard"
+  | "detailed"
+  | "forensic";
 // ReactComponentMode is now derived from outputDetail when reactEnabled is true
 export type ReactComponentMode = "smart" | "filtered" | "all" | "off";
 type MarkerClickBehavior = "edit" | "delete";
@@ -189,13 +209,48 @@ const OUTPUT_TO_REACT_MODE: Record<OutputDetailLevel, ReactComponentMode> = {
 };
 
 export const COLOR_OPTIONS = [
-  { id: "indigo",  label: "Indigo",  srgb: "#6155F5", p3: "color(display-p3 0.38 0.33 0.96)" },
-  { id: "blue",    label: "Blue",    srgb: "#0088FF", p3: "color(display-p3 0.00 0.53 1.00)" },
-  { id: "cyan",    label: "Cyan",    srgb: "#00C3D0", p3: "color(display-p3 0.00 0.76 0.82)" },
-  { id: "green",   label: "Green",   srgb: "#34C759", p3: "color(display-p3 0.20 0.78 0.35)" },
-  { id: "yellow",  label: "Yellow",  srgb: "#FFCC00", p3: "color(display-p3 1.00 0.80 0.00)" },
-  { id: "orange",  label: "Orange",  srgb: "#FF8D28", p3: "color(display-p3 1.00 0.55 0.16)" },
-  { id: "red",     label: "Red",     srgb: "#FF383C", p3: "color(display-p3 1.00 0.22 0.24)" },
+  {
+    id: "indigo",
+    label: "Indigo",
+    srgb: "#6155F5",
+    p3: "color(display-p3 0.38 0.33 0.96)",
+  },
+  {
+    id: "blue",
+    label: "Blue",
+    srgb: "#0088FF",
+    p3: "color(display-p3 0.00 0.53 1.00)",
+  },
+  {
+    id: "cyan",
+    label: "Cyan",
+    srgb: "#00C3D0",
+    p3: "color(display-p3 0.00 0.76 0.82)",
+  },
+  {
+    id: "green",
+    label: "Green",
+    srgb: "#34C759",
+    p3: "color(display-p3 0.20 0.78 0.35)",
+  },
+  {
+    id: "yellow",
+    label: "Yellow",
+    srgb: "#FFCC00",
+    p3: "color(display-p3 1.00 0.80 0.00)",
+  },
+  {
+    id: "orange",
+    label: "Orange",
+    srgb: "#FF8D28",
+    p3: "color(display-p3 1.00 0.55 0.16)",
+  },
+  {
+    id: "red",
+    label: "Red",
+    srgb: "#FF383C",
+    p3: "color(display-p3 1.00 0.22 0.24)",
+  },
 ];
 
 const injectAgentationColorTokens = () => {
@@ -204,7 +259,8 @@ const injectAgentationColorTokens = () => {
   const style = document.createElement("style");
   style.id = "agentation-color-tokens";
   style.textContent = [
-    ...COLOR_OPTIONS.map(c => `
+    ...COLOR_OPTIONS.map(
+      (c) => `
       [data-agentation-accent="${c.id}"] {
         --agentation-color-accent: ${c.srgb};
       }
@@ -214,18 +270,19 @@ const injectAgentationColorTokens = () => {
           --agentation-color-accent: ${c.p3};
         }
       }
-    `),
+    `,
+    ),
     `:root {
-      ${COLOR_OPTIONS.map(c => `--agentation-color-${c.id}: ${c.srgb};`).join("\n")}
+      ${COLOR_OPTIONS.map((c) => `--agentation-color-${c.id}: ${c.srgb};`).join("\n")}
     }`,
     `@supports (color: color(display-p3 0 0 0)) {
       :root {
-        ${COLOR_OPTIONS.map(c => `--agentation-color-${c.id}: ${c.p3};`).join("\n")}
+        ${COLOR_OPTIONS.map((c) => `--agentation-color-${c.id}: ${c.p3};`).join("\n")}
       }
     }`,
   ].join("");
   document.head.appendChild(style);
-}
+};
 
 injectAgentationColorTokens();
 
@@ -244,7 +301,10 @@ function deepElementFromPoint(x: number, y: number): HTMLElement | null {
 
   // Keep drilling down through shadow roots
   while (element?.shadowRoot) {
-    const deeper = element.shadowRoot.elementFromPoint(x, y) as HTMLElement | null;
+    const deeper = element.shadowRoot.elementFromPoint(
+      x,
+      y,
+    ) as HTMLElement | null;
     if (!deeper || deeper === element) break;
     element = deeper;
   }
@@ -271,7 +331,9 @@ function isRenderableAnnotation(annotation: Annotation): boolean {
 
 function detectSourceFile(element: Element): string | undefined {
   const result = getSourceLocation(element as HTMLElement);
-  const loc = result.found ? result : findNearestComponentSource(element as HTMLElement);
+  const loc = result.found
+    ? result
+    : findNearestComponentSource(element as HTMLElement);
   if (loc.found && loc.source) {
     return formatSourceLocation(loc.source, "path");
   }
@@ -345,7 +407,9 @@ export function PageFeedbackToolbarCSS({
   const [isActive, setIsActive] = useState(false);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [showMarkers, setShowMarkers] = useState(true);
-  const [isToolbarHidden, setIsToolbarHidden] = useState(() => loadToolbarHidden());
+  const [isToolbarHidden, setIsToolbarHidden] = useState(() =>
+    loadToolbarHidden(),
+  );
   const [isToolbarHiding, setIsToolbarHiding] = useState(false);
 
   // Stop native events from bubbling past document.body when they originate
@@ -440,21 +504,33 @@ export function PageFeedbackToolbarCSS({
   // Layout mode state
   const [isDesignMode, setIsDesignMode] = useState(false);
   const [designOverlayExiting, setDesignOverlayExiting] = useState(false);
-  const [designPlacements, setDesignPlacements] = useState<DesignPlacement[]>([]);
-  const [activeDesignComponent, setActiveDesignComponent] = useState<DesignComponentType | null>(null);
+  const [designPlacements, setDesignPlacements] = useState<DesignPlacement[]>(
+    [],
+  );
+  const [activeDesignComponent, setActiveDesignComponent] =
+    useState<DesignComponentType | null>(null);
   const designPlacementsLoaded = useRef(false);
   // Sub-mode state removed — unified mode renders both overlays simultaneously
   const [blankCanvas, setBlankCanvas] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false); // delays .visible by one frame on mount
   const [canvasOpacity, setCanvasOpacity] = useState(1);
-  const [canvasPurpose, setCanvasPurpose] = useState<import("../design-mode/types").CanvasPurpose>("new-page");
+  const [canvasPurpose, setCanvasPurpose] =
+    useState<import("../design-mode/types").CanvasPurpose>("new-page");
   const [wireframePurpose, setWireframePurpose] = useState("");
   const [designInteracting, setDesignInteracting] = useState(false);
-  const [rearrangeState, setRearrangeState] = useState<RearrangeState | null>(null);
+  const [rearrangeState, setRearrangeState] = useState<RearrangeState | null>(
+    null,
+  );
   const rearrangeLoaded = useRef(false);
   // Stash explore/wireframe state for full isolation between modes
-  const exploreStashRef = useRef<{ rearrange: RearrangeState | null; placements: DesignPlacement[] }>({ rearrange: null, placements: [] });
-  const wireframeStashRef = useRef<{ rearrange: RearrangeState | null; placements: DesignPlacement[] }>({ rearrange: null, placements: [] });
+  const exploreStashRef = useRef<{
+    rearrange: RearrangeState | null;
+    placements: DesignPlacement[];
+  }>({ rearrange: null, placements: [] });
+  const wireframeStashRef = useRef<{
+    rearrange: RearrangeState | null;
+    placements: DesignPlacement[];
+  }>({ rearrange: null, placements: [] });
   // Cross-overlay deselect signals — bump one to deselect the other
   const [designDeselectSignal, setDesignDeselectSignal] = useState(0);
   const [rearrangeDeselectSignal, setRearrangeDeselectSignal] = useState(0);
@@ -464,11 +540,15 @@ export function PageFeedbackToolbarCSS({
   const designSelectedIdsRef = useRef<Set<string>>(new Set());
   const rearrangeSelectedIdsRef = useRef<Set<string>>(new Set());
   // Track start positions for cross-drag (set when drag starts)
-  const crossDragStartRef = useRef<Map<string, { x: number; y: number }> | null>(null);
+  const crossDragStartRef = useRef<Map<
+    string,
+    { x: number; y: number }
+  > | null>(null);
   const designExitTimer = useRef<ReturnType<typeof originalSetTimeout>>();
 
   // Delay blank canvas .visible by one frame when becoming visible so CSS transition fires
-  const canvasShouldBeVisible = isDesignMode && isActive && !designOverlayExiting && blankCanvas;
+  const canvasShouldBeVisible =
+    isDesignMode && isActive && !designOverlayExiting && blankCanvas;
   useEffect(() => {
     if (canvasShouldBeVisible) {
       setCanvasReady(false);
@@ -484,26 +564,36 @@ export function PageFeedbackToolbarCSS({
   // Shadow annotation tracking (design → server sync)
   const placementAnnotationMap = useRef(new Map<string, string>()); // placementId → server annotationId
   const rearrangeAnnotationMap = useRef(new Map<string, string>()); // sectionId → server annotationId
-  const rearrangeDebounceTimer = useRef<ReturnType<typeof originalSetTimeout>>();
+  const rearrangeDebounceTimer =
+    useRef<ReturnType<typeof originalSetTimeout>>();
 
   // Draw mode state
   const [isDrawMode, setIsDrawMode] = useState(false);
-  const [drawStrokes, setDrawStrokes] = useState<Array<{ id: string; points: Array<{x: number, y: number}>; color: string; fixed: boolean }>>([]);
+  const [drawStrokes, setDrawStrokes] = useState<
+    Array<{
+      id: string;
+      points: Array<{ x: number; y: number }>;
+      color: string;
+      fixed: boolean;
+    }>
+  >([]);
   const drawStrokesRef = useRef(drawStrokes);
   drawStrokesRef.current = drawStrokes;
-  const [hoveredDrawingIdx, setHoveredDrawingIdx] = useState<number | null>(null);
+  const [hoveredDrawingIdx, setHoveredDrawingIdx] = useState<number | null>(
+    null,
+  );
   const drawCanvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef(false);
-  const currentStrokeRef = useRef<Array<{x: number, y: number}>>([]);
+  const currentStrokeRef = useRef<Array<{ x: number; y: number }>>([]);
   const dimAmountRef = useRef(0);
   const visualHighlightRef = useRef<number | null>(null);
   const exitingStrokeIdRef = useRef<string | null>(null);
   const exitingAlphaRef = useRef(1);
 
   const [tooltipSessionActive, setTooltipSessionActive] = useState(false);
-  const tooltipSessionTimerRef = useRef<ReturnType<typeof originalSetTimeout> | null>(
-    null,
-  );
+  const tooltipSessionTimerRef = useRef<ReturnType<
+    typeof originalSetTimeout
+  > | null>(null);
 
   // Cmd+shift+click multi-select state
   const [pendingMultiSelectElements, setPendingMultiSelectElements] = useState<
@@ -551,20 +641,24 @@ export function PageFeedbackToolbarCSS({
     };
   }, []);
 
-const [settings, setSettings] = useState<ToolbarSettings>(() => {
-  try {
-    const saved = JSON.parse(localStorage.getItem("feedback-toolbar-settings") ?? "");
-    return {
-      ...DEFAULT_SETTINGS,
-      ...saved,
-      annotationColorId: COLOR_OPTIONS.find(c => c.id === saved.annotationColorId)
-        ? saved.annotationColorId
-        : DEFAULT_SETTINGS.annotationColorId,
-    };
-  } catch {
-    return DEFAULT_SETTINGS;
-  }
-});
+  const [settings, setSettings] = useState<ToolbarSettings>(() => {
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem("feedback-toolbar-settings") ?? "",
+      );
+      return {
+        ...DEFAULT_SETTINGS,
+        ...saved,
+        annotationColorId: COLOR_OPTIONS.find(
+          (c) => c.id === saved.annotationColorId,
+        )
+          ? saved.annotationColorId
+          : DEFAULT_SETTINGS.annotationColorId,
+      };
+    } catch {
+      return DEFAULT_SETTINGS;
+    }
+  });
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [showEntranceAnimation, setShowEntranceAnimation] = useState(false);
 
@@ -574,7 +668,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     originalRequestAnimationFrame(() => {
       portalWrapperRef.current?.classList.remove(styles.disableTransitions);
     });
-  }
+  };
 
   // Check if running in development mode - React detection only works in development mode
   const isDevMode = process.env.NODE_ENV === "development";
@@ -631,7 +725,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
   const popupRef = useRef<AnnotationPopupCSSHandle>(null);
   const editPopupRef = useRef<AnnotationPopupCSSHandle>(null);
-  const scrollTimeoutRef = useRef<ReturnType<typeof originalSetTimeout> | null>(null);
+  const scrollTimeoutRef = useRef<ReturnType<typeof originalSetTimeout> | null>(
+    null,
+  );
 
   const pathname =
     typeof window !== "undefined" ? window.location.pathname : "/";
@@ -984,7 +1080,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     if (!endpoint || !mounted || !currentSessionId) return;
 
     const eventSource = new EventSource(
-      `${endpoint}/sessions/${currentSessionId}/events`
+      `${endpoint}/sessions/${currentSessionId}/events`,
     );
 
     const removedStatuses = ["resolved", "dismissed"];
@@ -998,21 +1094,31 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
           if (kind === "placement") {
             // Reverse-lookup: find which placementId maps to this annotation ID
-            for (const [placementId, annotationId] of placementAnnotationMap.current) {
+            for (const [
+              placementId,
+              annotationId,
+            ] of placementAnnotationMap.current) {
               if (annotationId === id) {
                 placementAnnotationMap.current.delete(placementId);
-                setDesignPlacements((prev) => prev.filter((p) => p.id !== placementId));
+                setDesignPlacements((prev) =>
+                  prev.filter((p) => p.id !== placementId),
+                );
                 break;
               }
             }
           } else if (kind === "rearrange") {
             // Reverse-lookup: find which sectionId maps to this annotation ID
-            for (const [sectionId, annotationId] of rearrangeAnnotationMap.current) {
+            for (const [
+              sectionId,
+              annotationId,
+            ] of rearrangeAnnotationMap.current) {
               if (annotationId === id) {
                 rearrangeAnnotationMap.current.delete(sectionId);
                 setRearrangeState((prev) => {
                   if (!prev) return null;
-                  const remaining = prev.sections.filter((s) => s.id !== sectionId);
+                  const remaining = prev.sections.filter(
+                    (s) => s.id !== sectionId,
+                  );
                   if (remaining.length === 0) return null;
                   return { ...prev, sections: remaining };
                 });
@@ -1061,7 +1167,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
           const localAnnotations = loadAnnotations<Annotation>(pathname);
           if (localAnnotations.length === 0) return;
 
-          const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+          const baseUrl =
+            typeof window !== "undefined" ? window.location.origin : "";
           const pageUrl = `${baseUrl}${pathname}`;
 
           // Get or create session
@@ -1089,7 +1196,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
           // Find annotations that need syncing
           const serverIds = new Set(serverAnnotations.map((a) => a.id));
-          const unsyncedLocal = localAnnotations.filter((a) => !serverIds.has(a.id));
+          const unsyncedLocal = localAnnotations.filter(
+            (a) => !serverIds.has(a.id),
+          );
 
           if (unsyncedLocal.length > 0) {
             const results = await Promise.allSettled(
@@ -1098,15 +1207,18 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                   ...annotation,
                   sessionId: sessionId!,
                   url: pageUrl,
-                })
-              )
+                }),
+              ),
             );
 
             const syncedAnnotations = results.map((result, i) => {
               if (result.status === "fulfilled") {
                 return result.value;
               }
-              console.warn("[Agentation] Failed to sync annotation on reconnect:", result.reason);
+              console.warn(
+                "[Agentation] Failed to sync annotation on reconnect:",
+                result.reason,
+              );
               return unsyncedLocal[i];
             });
 
@@ -1265,7 +1377,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         // Migrate old state that lacks currentRect
         const migrated = {
           ...stored,
-          sections: stored.sections.map(s => ({
+          sections: stored.sections.map((s) => ({
             ...s,
             currentRect: s.currentRect ?? { ...s.originalRect },
           })),
@@ -1309,22 +1421,43 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     // Save current wireframe state: either from stash (if in explore mode) or live (if in wireframe mode)
     if (blankCanvas) {
       // Currently in wireframe — save live state
-      const hasContent = (rearrangeState?.sections?.length ?? 0) > 0 || designPlacements.length > 0 || wireframePurpose;
+      const hasContent =
+        (rearrangeState?.sections?.length ?? 0) > 0 ||
+        designPlacements.length > 0 ||
+        wireframePurpose;
       if (hasContent) {
-        saveWireframeState(pathname, { rearrange: rearrangeState, placements: designPlacements, purpose: wireframePurpose });
+        saveWireframeState(pathname, {
+          rearrange: rearrangeState,
+          placements: designPlacements,
+          purpose: wireframePurpose,
+        });
       } else {
         clearWireframeState(pathname);
       }
     } else {
       // In explore mode — save stash
-      const hasContent = (stash.rearrange?.sections?.length ?? 0) > 0 || stash.placements.length > 0 || wireframePurpose;
+      const hasContent =
+        (stash.rearrange?.sections?.length ?? 0) > 0 ||
+        stash.placements.length > 0 ||
+        wireframePurpose;
       if (hasContent) {
-        saveWireframeState(pathname, { rearrange: stash.rearrange, placements: stash.placements, purpose: wireframePurpose });
+        saveWireframeState(pathname, {
+          rearrange: stash.rearrange,
+          placements: stash.placements,
+          purpose: wireframePurpose,
+        });
       } else {
         clearWireframeState(pathname);
       }
     }
-  }, [rearrangeState, designPlacements, wireframePurpose, blankCanvas, pathname, mounted]);
+  }, [
+    rearrangeState,
+    designPlacements,
+    wireframePurpose,
+    blankCanvas,
+    pathname,
+    mounted,
+  ]);
 
   // Initialize empty rearrange state when entering explore mode
   // Sections are captured on click, not auto-detected
@@ -1354,7 +1487,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
       const pageUrl =
         typeof window !== "undefined"
-          ? window.location.pathname + window.location.search + window.location.hash
+          ? window.location.pathname +
+            window.location.search +
+            window.location.hash
           : pathname;
 
       syncAnnotation(endpoint, currentSessionId, {
@@ -1384,7 +1519,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
           }
         })
         .catch((err) => {
-          console.warn("[Agentation] Failed to sync placement annotation:", err);
+          console.warn(
+            "[Agentation] Failed to sync placement annotation:",
+            err,
+          );
           currentMap.delete(p.id);
         });
     }
@@ -1425,7 +1563,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       const currentIds = new Set(rearrangeState.sections.map((s) => s.id));
       const pageUrl =
         typeof window !== "undefined"
-          ? window.location.pathname + window.location.search + window.location.hash
+          ? window.location.pathname +
+            window.location.search +
+            window.location.hash
           : pathname;
 
       // Check which sections have actually changed from original
@@ -1454,7 +1594,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
           updateAnnotationOnServer(endpoint, existingAnnotationId, {
             comment: `Move ${section.label} section (${section.tagName}) — from (${Math.round(orig.x)},${Math.round(orig.y)}) ${Math.round(orig.width)}×${Math.round(orig.height)} to (${Math.round(curr.x)},${Math.round(curr.y)}) ${Math.round(curr.width)}×${Math.round(curr.height)}`,
           }).catch((err) => {
-            console.warn("[Agentation] Failed to update rearrange annotation:", err);
+            console.warn(
+              "[Agentation] Failed to update rearrange annotation:",
+              err,
+            );
           });
         } else {
           // Create new
@@ -1486,7 +1629,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               }
             })
             .catch((err) => {
-              console.warn("[Agentation] Failed to sync rearrange annotation:", err);
+              console.warn(
+                "[Agentation] Failed to sync rearrange annotation:",
+                err,
+              );
               currentMap.delete(section.id);
             });
         }
@@ -1515,7 +1661,14 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
   // switches (rearrange ↔ add) and animate back when layout mode exits.
   type MovedEntry = {
     el: HTMLElement;
-    origStyles: { transform: string; transformOrigin: string; opacity: string; position: string; zIndex: string; display: string };
+    origStyles: {
+      transform: string;
+      transformOrigin: string;
+      opacity: string;
+      position: string;
+      zIndex: string;
+      display: string;
+    };
     ancestors: { el: HTMLElement; overflow: string }[];
   };
   const rearrangeMovedEls = useRef<Map<string, MovedEntry>>(new Map());
@@ -1546,7 +1699,11 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             let parent = el.parentElement;
             while (parent && parent !== document.body) {
               const cs = getComputedStyle(parent);
-              if (cs.overflow !== "visible" || cs.overflowX !== "visible" || cs.overflowY !== "visible") {
+              if (
+                cs.overflow !== "visible" ||
+                cs.overflowX !== "visible" ||
+                cs.overflowY !== "visible"
+              ) {
                 ancestors.push({ el: parent, overflow: parent.style.overflow });
                 parent.style.overflow = "visible";
               }
@@ -1565,7 +1722,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
           }
 
           // Ghost mode: don't transform page elements. Outlines show ghosts instead.
-        } catch { /* invalid selector */ }
+        } catch {
+          /* invalid selector */
+        }
       }
     }
 
@@ -1573,7 +1732,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     for (const [id, entry] of rearrangeMovedEls.current) {
       if (!active.has(id)) {
         const { el, origStyles, ancestors } = entry;
-        el.style.transition = "transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1)";
+        el.style.transition =
+          "transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1)";
         el.style.transform = origStyles.transform;
         el.style.transformOrigin = origStyles.transformOrigin;
         el.style.opacity = origStyles.opacity;
@@ -1596,7 +1756,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     return () => {
       for (const [, entry] of rearrangeMovedEls.current) {
         const { el, origStyles, ancestors } = entry;
-        el.style.transition = "transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1)";
+        el.style.transition =
+          "transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1)";
         el.style.transform = origStyles.transform;
         el.style.transformOrigin = origStyles.transformOrigin;
         el.style.opacity = origStyles.opacity;
@@ -1730,7 +1891,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       }));
 
       // Position marker near the last selected element (most recent click)
-      const lastItem = pendingMultiSelectElements[pendingMultiSelectElements.length - 1];
+      const lastItem =
+        pendingMultiSelectElements[pendingMultiSelectElements.length - 1];
       const lastEl = lastItem.element;
       const lastRect = freshRects[freshRects.length - 1];
       const lastCenterX = lastRect.left + lastRect.width / 2;
@@ -1752,7 +1914,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         isMultiSelect: true,
         isFixed: lastIsFixed,
         elementBoundingBoxes,
-        multiSelectElements: pendingMultiSelectElements.map((item) => item.element),
+        multiSelectElements: pendingMultiSelectElements.map(
+          (item) => item.element,
+        ),
         targetElement: lastEl, // Anchor marker/popup to last clicked element
         fullPath: getFullElementPath(firstEl),
         accessibility: getAccessibilityInfo(firstEl),
@@ -1798,12 +1962,44 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     if (!isActive) return;
 
     const textElementsSelector = [
-      "p", "span", "h1", "h2", "h3", "h4", "h5", "h6",
-      "li", "td", "th", "label", "blockquote", "figcaption",
-      "caption", "legend", "dt", "dd", "pre", "code",
-      "em", "strong", "b", "i", "u", "s", "a",
-      "time", "address", "cite", "q", "abbr", "dfn",
-      "mark", "small", "sub", "sup", "[contenteditable]"
+      "p",
+      "span",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "li",
+      "td",
+      "th",
+      "label",
+      "blockquote",
+      "figcaption",
+      "caption",
+      "legend",
+      "dt",
+      "dd",
+      "pre",
+      "code",
+      "em",
+      "strong",
+      "b",
+      "i",
+      "u",
+      "s",
+      "a",
+      "time",
+      "address",
+      "cite",
+      "q",
+      "abbr",
+      "dfn",
+      "mark",
+      "small",
+      "sub",
+      "sup",
+      "[contenteditable]",
     ].join(", ");
 
     const notAgentationSelector = `:not([data-agentation-root]):not([data-agentation-root] *)`;
@@ -1829,12 +2025,12 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     };
   }, [isActive]);
 
-
   // Cursor change when hovering a drawing stroke (both draw mode and normal mode)
   useEffect(() => {
     if (hoveredDrawingIdx !== null && isActive) {
       document.documentElement.setAttribute("data-drawing-hover", "");
-      return () => document.documentElement.removeAttribute("data-drawing-hover");
+      return () =>
+        document.documentElement.removeAttribute("data-drawing-hover");
     }
   }, [hoveredDrawingIdx, isActive]);
 
@@ -1875,7 +2071,14 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
     document.addEventListener("mousemove", handleMouseMove);
     return () => document.removeEventListener("mousemove", handleMouseMove);
-  }, [isActive, pendingAnnotation, isDrawMode, isDesignMode, effectiveReactMode, drawStrokes]);
+  }, [
+    isActive,
+    pendingAnnotation,
+    isDrawMode,
+    isDesignMode,
+    effectiveReactMode,
+    drawStrokes,
+  ]);
 
   // Start editing an annotation (right-click or click on drawing stroke)
   const startEditAnnotation = useCallback((annotation: Annotation) => {
@@ -2123,7 +2326,11 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       document.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleBlur);
     };
-  }, [isActive, pendingMultiSelectElements, createMultiSelectPendingAnnotation]);
+  }, [
+    isActive,
+    pendingMultiSelectElements,
+    createMultiSelectPendingAnnotation,
+  ]);
 
   // Multi-select drag - mousedown
   useEffect(() => {
@@ -2755,65 +2962,64 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
   );
 
   // Handle marker hover - finds element(s) for live position tracking
-  const handleMarkerHover = useCallback(
-    (annotation: Annotation | null) => {
-      if (!annotation) {
-        setHoveredMarkerId(null);
-        setHoveredTargetElement(null);
-        setHoveredTargetElements([]);
-        return;
-      }
+  const handleMarkerHover = useCallback((annotation: Annotation | null) => {
+    if (!annotation) {
+      setHoveredMarkerId(null);
+      setHoveredTargetElement(null);
+      setHoveredTargetElements([]);
+      return;
+    }
 
-      setHoveredMarkerId(annotation.id);
+    setHoveredMarkerId(annotation.id);
 
-      // Find elements at the annotation's position(s) for live tracking
-      if (annotation.elementBoundingBoxes?.length) {
-        // Cmd+shift+click: find element at each bounding box center
-        const elements: HTMLElement[] = [];
-        for (const bb of annotation.elementBoundingBoxes) {
-          const centerX = bb.x + bb.width / 2;
-          const centerY = bb.y + bb.height / 2 - window.scrollY;
-          // Use elementsFromPoint to look through the marker if it's covering
-          const allEls = document.elementsFromPoint(centerX, centerY);
-          const el = allEls.find(
-            (e) => !e.closest('[data-annotation-marker]') && !e.closest('[data-agentation-root]'),
-          ) as HTMLElement | undefined;
-          if (el) elements.push(el);
-        }
-        setHoveredTargetElements(elements);
-        setHoveredTargetElement(null);
-      } else if (annotation.boundingBox) {
-        // Single element
-        const bb = annotation.boundingBox;
+    // Find elements at the annotation's position(s) for live tracking
+    if (annotation.elementBoundingBoxes?.length) {
+      // Cmd+shift+click: find element at each bounding box center
+      const elements: HTMLElement[] = [];
+      for (const bb of annotation.elementBoundingBoxes) {
         const centerX = bb.x + bb.width / 2;
-        const centerY = annotation.isFixed
-          ? bb.y + bb.height / 2
-          : bb.y + bb.height / 2 - window.scrollY;
-        const el = deepElementFromPoint(centerX, centerY);
+        const centerY = bb.y + bb.height / 2 - window.scrollY;
+        // Use elementsFromPoint to look through the marker if it's covering
+        const allEls = document.elementsFromPoint(centerX, centerY);
+        const el = allEls.find(
+          (e) =>
+            !e.closest("[data-annotation-marker]") &&
+            !e.closest("[data-agentation-root]"),
+        ) as HTMLElement | undefined;
+        if (el) elements.push(el);
+      }
+      setHoveredTargetElements(elements);
+      setHoveredTargetElement(null);
+    } else if (annotation.boundingBox) {
+      // Single element
+      const bb = annotation.boundingBox;
+      const centerX = bb.x + bb.width / 2;
+      const centerY = annotation.isFixed
+        ? bb.y + bb.height / 2
+        : bb.y + bb.height / 2 - window.scrollY;
+      const el = deepElementFromPoint(centerX, centerY);
 
-        // Validate found element's size roughly matches stored bounding box
-        // (prevents using wrong child element when clicking center of a container)
-        if (el) {
-          const elRect = el.getBoundingClientRect();
-          const widthRatio = elRect.width / bb.width;
-          const heightRatio = elRect.height / bb.height;
-          // If found element is much smaller than stored, it's probably a child - don't use it
-          if (widthRatio < 0.5 || heightRatio < 0.5) {
-            setHoveredTargetElement(null);
-          } else {
-            setHoveredTargetElement(el);
-          }
-        } else {
+      // Validate found element's size roughly matches stored bounding box
+      // (prevents using wrong child element when clicking center of a container)
+      if (el) {
+        const elRect = el.getBoundingClientRect();
+        const widthRatio = elRect.width / bb.width;
+        const heightRatio = elRect.height / bb.height;
+        // If found element is much smaller than stored, it's probably a child - don't use it
+        if (widthRatio < 0.5 || heightRatio < 0.5) {
           setHoveredTargetElement(null);
+        } else {
+          setHoveredTargetElement(el);
         }
-        setHoveredTargetElements([]);
       } else {
         setHoveredTargetElement(null);
-        setHoveredTargetElements([]);
       }
-    },
-    [],
-  );
+      setHoveredTargetElements([]);
+    } else {
+      setHoveredTargetElement(null);
+      setHoveredTargetElements([]);
+    }
+  }, []);
 
   // Update annotation (edit mode submit)
   const updateAnnotation = useCallback(
@@ -2920,8 +3126,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
     // Animate out design placements and rearrange sections, then clear
     if (designPlacements.length > 0 || rearrangeState) {
-      setDesignClearSignal(n => n + 1);
-      setRearrangeClearSignal(n => n + 1);
+      setDesignClearSignal((n) => n + 1);
+      setRearrangeClearSignal((n) => n + 1);
       originalSetTimeout(() => {
         setDesignPlacements([]);
         setRearrangeState(null);
@@ -2941,7 +3147,18 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     }, totalAnimationTime);
 
     originalSetTimeout(() => setCleared(false), 1500);
-  }, [pathname, annotations, drawStrokes, designPlacements, rearrangeState, blankCanvas, wireframePurpose, onAnnotationsClear, fireWebhook, endpoint]);
+  }, [
+    pathname,
+    annotations,
+    drawStrokes,
+    designPlacements,
+    rearrangeState,
+    blankCanvas,
+    wireframePurpose,
+    onAnnotationsClear,
+    fireWebhook,
+    endpoint,
+  ]);
 
   // Copy output
   const copyOutput = useCallback(async () => {
@@ -2956,15 +3173,18 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     let output: string;
     if (wireframeOnly) {
       // In wireframe mode, skip annotations and draw strokes — only include layout
-      if (designPlacements.length === 0 && !rearrangeState && !wireframePurpose) return;
+      if (designPlacements.length === 0 && !rearrangeState && !wireframePurpose)
+        return;
       output = "";
     } else {
-      output = generateOutput(
-        annotations,
-        displayUrl,
-        settings.outputDetail,
-      );
-      if (!output && drawStrokes.length === 0 && designPlacements.length === 0 && !rearrangeState) return;
+      output = generateOutput(annotations, displayUrl, settings.outputDetail);
+      if (
+        !output &&
+        drawStrokes.length === 0 &&
+        designPlacements.length === 0 &&
+        !rearrangeState
+      )
+        return;
       if (!output) output = `## Page Feedback: ${displayUrl}\n`;
     }
 
@@ -2991,10 +3211,13 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         // Get viewport coords for analysis (fixed strokes are already in viewport coords)
         const viewportPoints = stroke.fixed
           ? stroke.points
-          : stroke.points.map(p => ({ x: p.x, y: p.y - scrollY }));
+          : stroke.points.map((p) => ({ x: p.x, y: p.y - scrollY }));
 
         // Bounding box (viewport coords)
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
         for (const p of viewportPoints) {
           minX = Math.min(minX, p.x);
           minY = Math.min(minY, p.y);
@@ -3025,10 +3248,12 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             const nearRight = maxX - p.x < edgeThreshold;
             const nearTop = p.y - minY < edgeThreshold;
             const nearBottom = maxY - p.y < edgeThreshold;
-            if ((nearLeft || nearRight) && (nearTop || nearBottom)) edgePoints++;
+            if ((nearLeft || nearRight) && (nearTop || nearBottom))
+              edgePoints++;
           }
           // If many points are near corners, it's a box
-          gesture = edgePoints > viewportPoints.length * 0.15 ? "box" : "circle";
+          gesture =
+            edgePoints > viewportPoints.length * 0.15 ? "box" : "circle";
         } else if (aspectRatio > 3 && bboxH < 40) {
           gesture = "underline";
         } else if (startEndDist > bboxDiag * 0.5) {
@@ -3039,7 +3264,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
         // Sample elements along the stroke
         const sampleCount = Math.min(10, viewportPoints.length);
-        const step = Math.max(1, Math.floor(viewportPoints.length / sampleCount));
+        const step = Math.max(
+          1,
+          Math.floor(viewportPoints.length / sampleCount),
+        );
         const seenElements = new Set<HTMLElement>();
         const elementNames: string[] = [];
 
@@ -3064,7 +3292,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         const region = `${Math.round(minX)},${Math.round(minY)} → ${Math.round(maxX)},${Math.round(maxY)}`;
         let desc: string;
 
-        if ((gesture === "circle" || gesture === "box") && elementNames.length > 0) {
+        if (
+          (gesture === "circle" || gesture === "box") &&
+          elementNames.length > 0
+        ) {
           const verb = gesture === "box" ? "Boxed" : "Circled";
           desc = `${verb} **${elementNames[0]}**${elementNames.length > 1 ? ` (and ${elementNames.slice(1).join(", ")})` : ""} (region: ${region})`;
         } else if (gesture === "underline" && elementNames.length > 0) {
@@ -3092,18 +3323,29 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
     // Append design layout section if there are placements (or purpose in wireframe mode)
     if (designPlacements.length > 0 || (wireframeOnly && wireframePurpose)) {
-      output += "\n" + generateDesignOutput(designPlacements, {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      }, { blankCanvas, wireframePurpose: wireframePurpose || undefined }, settings.outputDetail);
+      output +=
+        "\n" +
+        generateDesignOutput(
+          designPlacements,
+          {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          },
+          { blankCanvas, wireframePurpose: wireframePurpose || undefined },
+          settings.outputDetail,
+        );
     }
 
     // Append rearrange section if sections were reordered
     if (rearrangeState) {
-      const rearrangeOutput = generateRearrangeOutput(rearrangeState, settings.outputDetail, {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
+      const rearrangeOutput = generateRearrangeOutput(
+        rearrangeState,
+        settings.outputDetail,
+        {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        },
+      );
       if (rearrangeOutput) {
         output += "\n" + rearrangeOutput;
       }
@@ -3152,28 +3394,35 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
           window.location.search +
           window.location.hash
         : pathname;
-    let output = generateOutput(
-      annotations,
-      displayUrl,
-      settings.outputDetail,
-    );
+    let output = generateOutput(annotations, displayUrl, settings.outputDetail);
     if (!output && designPlacements.length === 0 && !rearrangeState) return;
     if (!output) output = `## Page Feedback: ${displayUrl}\n`;
 
     // Append design layout section if there are placements
     if (designPlacements.length > 0) {
-      output += "\n" + generateDesignOutput(designPlacements, {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      }, { blankCanvas, wireframePurpose: wireframePurpose || undefined }, settings.outputDetail);
+      output +=
+        "\n" +
+        generateDesignOutput(
+          designPlacements,
+          {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          },
+          { blankCanvas, wireframePurpose: wireframePurpose || undefined },
+          settings.outputDetail,
+        );
     }
 
     // Append rearrange section if sections were reordered
     if (rearrangeState) {
-      const rearrangeOutput = generateRearrangeOutput(rearrangeState, settings.outputDetail, {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
+      const rearrangeOutput = generateRearrangeOutput(
+        rearrangeState,
+        settings.outputDetail,
+        {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        },
+      );
       if (rearrangeOutput) {
         output += "\n" + rearrangeOutput;
       }
@@ -3292,7 +3541,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       // Only drag when clicking the toolbar background (not buttons or settings)
       if (
         (e.target as HTMLElement).closest("button") ||
-        (e.target as HTMLElement).closest('[data-agentation-settings-panel]')
+        (e.target as HTMLElement).closest("[data-agentation-settings-panel]")
       ) {
         return;
       }
@@ -3404,7 +3653,11 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       }
 
       // Cmd+Shift+F / Ctrl+Shift+F to toggle feedback mode
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "f" || e.key === "F")) {
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        (e.key === "f" || e.key === "F")
+      ) {
         e.preventDefault();
         hideTooltipsUntilMouseLeave();
         if (isActive) {
@@ -3450,7 +3703,11 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
       // "C" to copy output
       if (e.key === "c" || e.key === "C") {
-        if (annotations.length > 0 || designPlacements.length > 0 || rearrangeState) {
+        if (
+          annotations.length > 0 ||
+          designPlacements.length > 0 ||
+          rearrangeState
+        ) {
           e.preventDefault();
           hideTooltipsUntilMouseLeave();
           copyOutput();
@@ -3459,7 +3716,11 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
       // "X" to clear all
       if (e.key === "x" || e.key === "X") {
-        if (annotations.length > 0 || designPlacements.length > 0 || rearrangeState) {
+        if (
+          annotations.length > 0 ||
+          designPlacements.length > 0 ||
+          rearrangeState
+        ) {
           e.preventDefault();
           hideTooltipsUntilMouseLeave();
           clearAll();
@@ -3472,11 +3733,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       if (e.key === "s" || e.key === "S") {
         const hasValidWebhook =
           isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "");
-        if (
-          annotations.length > 0 &&
-          hasValidWebhook &&
-          sendState === "idle"
-        ) {
+        if (annotations.length > 0 && hasValidWebhook && sendState === "idle") {
           e.preventDefault();
           hideTooltipsUntilMouseLeave();
           sendToWebhook();
@@ -3512,7 +3769,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
   // Filter annotations for rendering (exclude exiting ones from normal flow)
   const visibleAnnotations = annotations.filter(
-    (a) => !exitingMarkers.has(a.id) && a.kind !== "placement" && a.kind !== "rearrange",
+    (a) =>
+      !exitingMarkers.has(a.id) &&
+      a.kind !== "placement" &&
+      a.kind !== "rearrange",
   );
   const hasVisibleAnnotations = visibleAnnotations.length > 0;
   const exitingAnnotationsList = annotations.filter((a) =>
@@ -3565,7 +3825,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     return styles;
   };
 
-  // const toolbarButtons: ToolbarButtonProps[] = [
+  // const toolbarB.uttons: ToolbarButto.nProps[] = [
   //   {
   //     title: isFrozen ? "Resume animations" : "Pause animations",
   //     shortcut: "P",
@@ -3653,8 +3913,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       data-agentation-theme={isDarkMode ? "dark" : "light"}
       data-agentation-accent={settings.annotationColorId}
       data-agentation-root=""
+      data-feedback-toolbar=""
     >
-      {/* Toolbar */}
       <Toolbar
         style={
           toolbarPosition
@@ -3668,6 +3928,24 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         }
         open={isActive}
         onOpenChange={setIsActive}
+        badgeCount={visibleAnnotations.length}
+        animationsPaused={isFrozen}
+        onToggleAnimations={toggleFreeze}
+        layoutModeActive={isDesignMode}
+        onToggleLayoutMode={() => setIsDesignMode(!isDesignMode)}
+        markersVisible={showMarkers}
+        onToggleMarkers={() => setShowMarkers(!showMarkers)}
+        onSendFeedback={sendToWebhook}
+        sendFeedbackVisible={
+          !settings.webhooksEnabled &&
+          isValidUrl(settings.webhookUrl || webhookUrl || "")
+        }
+        onClear={clearAll}
+        settingsVisible={showSettings}
+        onToggleSettings={() => {
+          if (isDesignMode) closeDesignMode();
+          setShowSettings(!showSettings);
+        }}
       >
         <DesignPalette
           visible={isDesignMode && isActive}
@@ -3839,532 +4117,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
           onSettingsPageChange={setSettingsPage}
           onHideToolbar={hideToolbarTemporarily}
         />
-        <ToolbarButtonsContainer>
-          <ToolbarButton
-            title={isFrozen ? "Resume animations" : "Pause animations"}
-            icon={<IconPausePlayAnimated size={24} isPaused={isFrozen} />}
-            active={isFrozen}
-            onClick={toggleFreeze}
-          />
-          <ToolbarButton
-            title={isDesignMode ? "Exit layout mode" : "Layout mode"}
-            icon={<IconLayout />}
-            active={isDesignMode}
-            onClick={() =>
-              isDesignMode ? closeDesignMode() : setIsDesignMode(true)
-            }
-          />
-          <ToolbarButton
-            title={showMarkers ? "Hide markers" : "Show markers"}
-            icon={<IconEyeAnimated size={24} isOpen={showMarkers} />}
-            disabled={!hasAnnotations || isDesignMode}
-            onClick={() => setShowMarkers(!showMarkers)}
-          />
-          <ToolbarButton
-            title="Clear all"
-            icon={<IconTrashAlt size={24} />}
-            disabled={!hasAnnotations}
-            onClick={clearAll}
-          />
-          <ToolbarButton
-            title="Settings"
-            icon={<IconGear size={24} />}
-            onClick={() => setShowSettings(!showSettings)}
-          />
-        </ToolbarButtonsContainer>
       </Toolbar>
-      {false && (
-        <div
-          className={`${styles.toolbar}${userClassName ? ` ${userClassName}` : ""}`}
-          data-feedback-toolbar
-          style={
-            toolbarPosition
-              ? {
-                  left: toolbarPosition.x,
-                  top: toolbarPosition.y,
-                  right: "auto",
-                  bottom: "auto",
-                }
-              : undefined
-          }
-        >
-          {/* Morphing container */}
-          <div
-            className={`${styles.toolbarContainer} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
-            onClick={
-              !isActive
-                ? (e) => {
-                    // Don't activate if we just finished dragging
-                    if (justFinishedToolbarDragRef.current) {
-                      justFinishedToolbarDragRef.current = false;
-                      e.preventDefault();
-                      return;
-                    }
-                    setIsActive(true);
-                  }
-                : undefined
-            }
-            onMouseDown={handleToolbarMouseDown}
-            role={!isActive ? "button" : undefined}
-            tabIndex={!isActive ? 0 : -1}
-            title={!isActive ? "Start feedback mode" : undefined}
-          >
-            {/* Toggle content - visible when collapsed */}
-            <div
-              className={`${styles.toggleContent} ${!isActive ? styles.visible : styles.hidden}`}
-            >
-              <IconListSparkle size={24} />
-            </div>
-
-            {hasVisibleAnnotations && (
-              <span
-                className={`${styles.badge} ${isActive ? styles.fadeOut : ""} ${showEntranceAnimation ? styles.entrance : ""}`}
-              >
-                {visibleAnnotations.length}
-              </span>
-            )}
-
-            {/* Controls content - visible when expanded */}
-            <div
-              className={`${styles.controlsContent} ${isActive ? styles.visible : styles.hidden} ${
-                toolbarPosition && toolbarPosition.y < 100
-                  ? styles.tooltipBelow
-                  : ""
-              } ${tooltipsHidden || showSettings || isDesignMode ? styles.tooltipsHidden : ""} ${tooltipSessionActive ? styles.tooltipsInSession : ""}`}
-              onMouseEnter={handleControlsMouseEnter}
-              onMouseLeave={handleControlsMouseLeave}
-            >
-              <div
-                className={`${styles.buttonWrapper} ${
-                  toolbarPosition && toolbarPosition.x < 120
-                    ? styles.buttonWrapperAlignLeft
-                    : ""
-                }`}
-              >
-                <button
-                  className={styles.controlButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    hideTooltipsUntilMouseLeave();
-                    toggleFreeze();
-                  }}
-                  data-active={isFrozen}
-                >
-                  <IconPausePlayAnimated size={24} isPaused={isFrozen} />
-                </button>
-                <span className={styles.buttonTooltip}>
-                  {isFrozen ? "Resume animations" : "Pause animations"}
-                  <span className={styles.shortcut}>P</span>
-                </span>
-              </div>
-
-              {/* Draw mode disabled for now
-            <div className={styles.buttonWrapper}>
-              <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  if (isDesignMode) closeDesignMode();
-                  setIsDrawMode(prev => !prev);
-                }}
-                data-active={isDrawMode}
-              >
-                <IconPencil size={24} />
-              </button>
-              <span className={styles.buttonTooltip}>
-                {isDrawMode ? "Exit draw mode" : "Draw mode"}
-                <span className={styles.shortcut}>D</span>
-              </span>
-            </div>
-            */}
-
-              <div className={styles.buttonWrapper}>
-                <button
-                  className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    hideTooltipsUntilMouseLeave();
-                    if (isDrawMode) setIsDrawMode(false);
-                    if (showSettings) setShowSettings(false);
-                    if (pendingAnnotation) cancelAnnotation();
-                    if (isDesignMode) {
-                      closeDesignMode();
-                    } else {
-                      setIsDesignMode(true);
-                    }
-                  }}
-                  data-active={isDesignMode}
-                  style={
-                    isDesignMode && blankCanvas
-                      ? {
-                          color: "#f97316",
-                          background: "rgba(249, 115, 22, 0.25)",
-                        }
-                      : undefined
-                  }
-                >
-                  <IconLayout />
-                </button>
-                <span className={styles.buttonTooltip}>
-                  {isDesignMode ? "Exit layout mode" : "Layout mode"}
-                  <span className={styles.shortcut}>L</span>
-                </span>
-              </div>
-
-              <div className={styles.buttonWrapper}>
-                <button
-                  className={styles.controlButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    hideTooltipsUntilMouseLeave();
-                    setShowMarkers(!showMarkers);
-                  }}
-                  disabled={!hasAnnotations || isDesignMode}
-                >
-                  <IconEyeAnimated size={24} isOpen={showMarkers} />
-                </button>
-                <span className={styles.buttonTooltip}>
-                  {showMarkers ? "Hide markers" : "Show markers"}
-                  <span className={styles.shortcut}>H</span>
-                </span>
-              </div>
-
-              <div className={styles.buttonWrapper}>
-                <button
-                  className={`${styles.controlButton} ${copied ? styles.statusShowing : ""}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    hideTooltipsUntilMouseLeave();
-                    copyOutput();
-                  }}
-                  disabled={
-                    isDesignMode && blankCanvas
-                      ? designPlacements.length === 0 &&
-                        !rearrangeState?.sections?.length
-                      : !hasAnnotations &&
-                        drawStrokes.length === 0 &&
-                        designPlacements.length === 0 &&
-                        !rearrangeState?.sections?.length
-                  }
-                  data-active={copied}
-                >
-                  <IconCopyAnimated
-                    size={24}
-                    copied={copied}
-                    tint={
-                      isDesignMode &&
-                      blankCanvas &&
-                      (designPlacements.length > 0 ||
-                        !!rearrangeState?.sections?.length)
-                        ? "#f97316"
-                        : undefined
-                    }
-                  />
-                </button>
-                <span className={styles.buttonTooltip}>
-                  {isDesignMode && blankCanvas
-                    ? "Copy layout"
-                    : "Copy feedback"}
-                  <span className={styles.shortcut}>C</span>
-                </span>
-              </div>
-
-              {/* Send button - only visible when webhook URL is available AND auto-send is off */}
-              <div
-                className={`${styles.buttonWrapper} ${styles.sendButtonWrapper} ${isActive && !settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.sendButtonVisible : ""}`}
-              >
-                <button
-                  className={`${styles.controlButton} ${sendState === "sent" || sendState === "failed" ? styles.statusShowing : ""}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    hideTooltipsUntilMouseLeave();
-                    sendToWebhook();
-                  }}
-                  disabled={
-                    !hasAnnotations ||
-                    (!isValidUrl(settings.webhookUrl) &&
-                      !isValidUrl(webhookUrl || "")) ||
-                    sendState === "sending"
-                  }
-                  data-no-hover={sendState === "sent" || sendState === "failed"}
-                  tabIndex={
-                    isValidUrl(settings.webhookUrl) ||
-                    isValidUrl(webhookUrl || "")
-                      ? 0
-                      : -1
-                  }
-                >
-                  <IconSendArrow size={24} state={sendState} />
-                  {hasAnnotations && sendState === "idle" && (
-                    <span className={styles.buttonBadge}>
-                      {annotations.length}
-                    </span>
-                  )}
-                </button>
-                <span className={styles.buttonTooltip}>
-                  Send Annotations
-                  <span className={styles.shortcut}>S</span>
-                </span>
-              </div>
-
-              <div className={styles.buttonWrapper}>
-                <button
-                  className={styles.controlButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    hideTooltipsUntilMouseLeave();
-                    clearAll();
-                  }}
-                  disabled={
-                    !hasAnnotations &&
-                    drawStrokes.length === 0 &&
-                    designPlacements.length === 0 &&
-                    !rearrangeState?.sections?.length
-                  }
-                  data-danger
-                >
-                  <IconTrashAlt size={24} />
-                </button>
-                <span className={styles.buttonTooltip}>
-                  Clear all
-                  <span className={styles.shortcut}>X</span>
-                </span>
-              </div>
-
-              <div className={styles.buttonWrapper}>
-                <button
-                  className={styles.controlButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    hideTooltipsUntilMouseLeave();
-                    if (isDesignMode) closeDesignMode();
-                    setShowSettings(!showSettings);
-                  }}
-                >
-                  <IconGear size={24} />
-                </button>
-                {endpoint && connectionStatus !== "disconnected" && (
-                  <span
-                    className={`${styles.mcpIndicator} ${styles[connectionStatus]} ${showSettings ? styles.hidden : ""}`}
-                    title={
-                      connectionStatus === "connected"
-                        ? "MCP Connected"
-                        : "MCP Connecting…"
-                    }
-                  />
-                )}
-                <span className={styles.buttonTooltip}>Settings</span>
-              </div>
-
-              <div className={styles.divider} />
-
-              <div
-                className={`${styles.buttonWrapper} ${
-                  toolbarPosition &&
-                  typeof window !== "undefined" &&
-                  toolbarPosition.x > window.innerWidth - 120
-                    ? styles.buttonWrapperAlignRight
-                    : ""
-                }`}
-              >
-                <button
-                  className={styles.controlButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    hideTooltipsUntilMouseLeave();
-                    deactivate();
-                  }}
-                >
-                  <IconXmarkLarge size={24} />
-                </button>
-                <span className={styles.buttonTooltip}>
-                  Exit
-                  <span className={styles.shortcut}>Esc</span>
-                </span>
-              </div>
-            </div>
-
-            {/* Layout Mode Palette */}
-            <DesignPalette
-              visible={isDesignMode && isActive}
-              activeType={activeDesignComponent}
-              onSelect={(type) => {
-                setActiveDesignComponent(
-                  activeDesignComponent === type ? null : type,
-                );
-              }}
-              isDarkMode={isDarkMode}
-              sectionCount={rearrangeState?.sections.length ?? 0}
-              onDetectSections={() => {
-                const sections = detectPageSections();
-                const existing = rearrangeState?.sections ?? [];
-                const existingSelectors = new Set(
-                  existing.map((s) => s.selector),
-                );
-                const newSections = sections.filter(
-                  (s) => !existingSelectors.has(s.selector),
-                );
-                const merged = [...existing, ...newSections];
-                const mergedOrder = [
-                  ...(rearrangeState?.originalOrder ?? []),
-                  ...newSections.map((s) => s.id),
-                ];
-                setRearrangeState({
-                  sections: merged,
-                  originalOrder: mergedOrder,
-                  detectedAt: Date.now(),
-                });
-              }}
-              placementCount={designPlacements.length}
-              onClearPlacements={() => {
-                // Animate placements and rearrange sections out, then clear
-                setDesignClearSignal((n) => n + 1);
-                setRearrangeClearSignal((n) => n + 1);
-                originalSetTimeout(() => {
-                  setRearrangeState({
-                    sections: [],
-                    originalOrder: [],
-                    detectedAt: Date.now(),
-                  });
-                }, 200);
-              }}
-              blankCanvas={blankCanvas}
-              onBlankCanvasChange={(on) => {
-                const emptyRearrange = {
-                  sections: [],
-                  originalOrder: [],
-                  detectedAt: Date.now(),
-                };
-                if (on) {
-                  // Entering wireframe: stash all explore state, restore wireframe state
-                  exploreStashRef.current = {
-                    rearrange: rearrangeState,
-                    placements: designPlacements,
-                  };
-                  setRearrangeState(
-                    wireframeStashRef.current.rearrange || emptyRearrange,
-                  );
-                  setDesignPlacements(wireframeStashRef.current.placements);
-                  setActiveDesignComponent(null);
-                } else {
-                  // Leaving wireframe: stash all wireframe state, restore explore state
-                  wireframeStashRef.current = {
-                    rearrange: rearrangeState,
-                    placements: designPlacements,
-                  };
-                  setRearrangeState(
-                    exploreStashRef.current.rearrange || emptyRearrange,
-                  );
-                  setDesignPlacements(exploreStashRef.current.placements);
-                }
-                setBlankCanvas(on);
-              }}
-              wireframePurpose={wireframePurpose}
-              onWireframePurposeChange={setWireframePurpose}
-              Tooltip={HelpTooltip}
-              onDragStart={(type, e) => {
-                e.preventDefault();
-                const def = DEFAULT_SIZES[type];
-                let preview: HTMLDivElement | null = null;
-                let didDrag = false;
-                const startX = e.clientX;
-                const startY = e.clientY;
-
-                // Find toolbar bottom for distance-based scaling
-                const toolbar = (e.target as HTMLElement).closest(
-                  "[data-feedback-toolbar]",
-                );
-                const toolbarTop =
-                  toolbar?.getBoundingClientRect().top ?? window.innerHeight;
-
-                const onMove = (ev: MouseEvent) => {
-                  const dx = ev.clientX - startX;
-                  const dy = ev.clientY - startY;
-
-                  if (!didDrag && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
-                    didDrag = true;
-                    preview = document.createElement("div");
-                    preview.className = `${designStyles.dragPreview}${blankCanvas ? ` ${designStyles.dragPreviewWireframe}` : ""}`;
-                    document.body.appendChild(preview);
-                  }
-
-                  if (!preview) return;
-
-                  // Scale up as cursor moves away from toolbar
-                  const dist = Math.max(0, toolbarTop - ev.clientY);
-                  const progress = Math.min(1, dist / 180);
-                  const eased = 1 - Math.pow(1 - progress, 2); // ease-out
-
-                  const minW = 28;
-                  const minH = 20;
-                  const maxW = Math.min(140, def.width * 0.18);
-                  const maxH = Math.min(90, def.height * 0.18);
-                  const w = minW + (maxW - minW) * eased;
-                  const h = minH + (maxH - minH) * eased;
-
-                  preview.style.width = `${w}px`;
-                  preview.style.height = `${h}px`;
-                  preview.style.left = `${ev.clientX - w / 2}px`;
-                  preview.style.top = `${ev.clientY - h / 2}px`;
-                  preview.style.opacity = `${0.5 + 0.5 * eased}`;
-                  preview.textContent = eased > 0.25 ? type : "";
-                };
-
-                const onUp = (ev: MouseEvent) => {
-                  window.removeEventListener("mousemove", onMove);
-                  window.removeEventListener("mouseup", onUp);
-                  if (preview) document.body.removeChild(preview);
-
-                  if (didDrag) {
-                    const w = def.width;
-                    const h = def.height;
-                    const scrollY = window.scrollY;
-                    const x = Math.max(0, ev.clientX - w / 2);
-                    const y = Math.max(0, ev.clientY + scrollY - h / 2);
-                    const placement: DesignPlacement = {
-                      id: `dp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                      type,
-                      x,
-                      y,
-                      width: w,
-                      height: h,
-                      scrollY,
-                      timestamp: Date.now(),
-                    };
-                    setDesignPlacements((prev) => [...prev, placement]);
-                    setActiveDesignComponent(null);
-                    // Deselect any previously selected placements
-                    designSelectedIdsRef.current = new Set();
-                    setDesignDeselectSignal((n) => n + 1);
-                  }
-                };
-
-                window.addEventListener("mousemove", onMove);
-                window.addEventListener("mouseup", onUp);
-              }}
-            />
-
-            <SettingsPanel
-              settings={settings}
-              onSettingsChange={(patch) =>
-                setSettings((s) => ({ ...s, ...patch }))
-              }
-              isDarkMode={isDarkMode}
-              onToggleTheme={toggleTheme}
-              isDevMode={isDevMode}
-              connectionStatus={connectionStatus}
-              endpoint={endpoint}
-              isVisible={showSettingsVisible}
-              toolbarNearBottom={!!toolbarPosition && toolbarPosition.y < 230}
-              settingsPage={settingsPage}
-              onSettingsPageChange={setSettingsPage}
-              onHideToolbar={hideToolbarTemporarily}
-            />
-          </div>
-        </div>
-      )}
-
       {/* Blank canvas backdrop — stays mounted so opacity transition works on open/close */}
       {(isDesignMode || designOverlayExiting) && (
         <div
