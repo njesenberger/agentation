@@ -144,6 +144,7 @@ export const Toolbar = ({
           className={styles.toolbarMenuButton}
           onClick={() => onOpenChange(true)}
           type="button"
+          disabled={open}
         >
           <IconListSparkle className={styles.toolbarMenuButtonIcon} />
         </button>
@@ -182,7 +183,7 @@ export const Toolbar = ({
             className={`${styles.toolbarButton} ${!sendFeedbackVisible ? styles.hidden : ""}`}
             onClick={onSendFeedback}
             type="button"
-            disabled={!badgeCount}
+            disabled={!sendFeedbackVisible || !badgeCount}
           >
             <IconSendArrow
               className={styles.toolbarButtonIcon}

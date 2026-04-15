@@ -49,7 +49,7 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
   pointer-events: none;
 
   &.hidden {
-    transform: scale(0.25);
+    transform: scale(0.33);
     opacity: 0;
     pointer-events: none;
   }
@@ -80,7 +80,7 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
   }
 
   @media (hover: hover) {
-    &:has(.toolbarMenuButton:hover) {
+    &:has(.toolbarMenuButton:not(:disabled):hover) {
       background-color: #313131;
 
       [data-agentation-theme="light"] & {
@@ -107,8 +107,8 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
     color: #1a1a1a;
   }
 
-  .open & {
-    pointer-events: none;
+  &:disabled {
+    cursor: pointer;
   }
 }
 
@@ -213,13 +213,14 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
   &.hidden {
     margin: 0 -3px;
     width: 0;
-    transform: scale(0.25);
+    transform: scale(0.5);
     opacity: 0;
   }
 }
 
 .toolbarButtonIcon {
   position: absolute;
+  max-width: none;
 }
 
 .toolbarButtonBadge {
@@ -248,7 +249,7 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
   }
 
   &.hidden {
-    transform: scale(0.25);
+    transform: scale(0.33);
     opacity: 0;
     pointer-events: none;
   }
