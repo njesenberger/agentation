@@ -1,3 +1,0 @@
-[    1770ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/test-modals:0
-[    1950ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/test-modals:0
-[    2013ms] [WARNING] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview @ http://localhost:3001/_next/static/chunks/80c0e_next_dist_271b56bf._.js:2287
