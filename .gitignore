@@ -1,8 +1,13 @@
-node_modules/.claude/settings.local.json
 node_modules
 mcp/dist
 .DS_Store
 
+# Local Claude settings
+.claude/settings.local.json
+
 # Test artifacts
 .playwright-mcp/
 test-*.png
+
+# Root-level scratch screenshots
+/*.png
