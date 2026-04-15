@@ -113,7 +113,16 @@
       "mcp__plugin_playwright_playwright__browser_take_screenshot",
       "Bash(wc:*)",
       "mcp__agentation__agentation_acknowledge",
-      "Bash(git cherry-pick:*)"
+      "Bash(git cherry-pick:*)",
+      "mcp__agentation__agentation_dismiss",
+      "Bash(pnpm --filter agentation-mcp build)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:openai.github.io)",
+      "WebFetch(domain:developers.openai.com)",
+      "Bash(pnpm --filter mcp exec tsc --noEmit)",
+      "Bash(python3:*)",
+      "mcp__agentation__agentation_resolve"
     ]
   },
   "enableAllProjectMcpServers": true,

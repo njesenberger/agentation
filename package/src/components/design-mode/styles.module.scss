@@ -486,6 +486,38 @@ $red: #ef4444;
     animation: none;
     transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.32, 0.72, 0, 1);
   }
+
+  &.building {
+    pointer-events: none;
+    cursor: default;
+    animation: buildingShimmer 2s ease-in-out infinite;
+
+    .wireframe & {
+      animation: buildingShimmerOrange 2s ease-in-out infinite;
+    }
+  }
+}
+
+@keyframes buildingShimmer {
+  0%, 100% {
+    background: rgba(59, 130, 246, 0.06);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.5);
+  }
+}
+
+@keyframes buildingShimmerOrange {
+  0%, 100% {
+    background: rgba(249, 115, 22, 0.06);
+    border-color: rgba(249, 115, 22, 0.3);
+  }
+  50% {
+    background: rgba(249, 115, 22, 0.18);
+    border-color: rgba(249, 115, 22, 0.5);
+  }
 }
 
 .placementContent {

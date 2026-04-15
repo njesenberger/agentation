@@ -125,6 +125,7 @@ export type AgentStatusPayload = {
   active: boolean;
   tool_name?: string;
   notification_type?: string;
+  url?: string; // Created page URL — shown as CTA in the activity badge
   timestamp: string;
 };
 

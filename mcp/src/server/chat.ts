@@ -34,7 +34,7 @@ export type ChatStreamEvent =
   | { type: "tool_use"; name: string; input: Record<string, unknown> }
   | { type: "tool_result"; name: string; result: string }
   | { type: "message_break" }
-  | { type: "complete" }
+  | { type: "complete"; url?: string }
   | { type: "error"; message: string };
 
 // ---------------------------------------------------------------------------
@@ -355,9 +355,13 @@ function parseSourceHints(message: string): Map<string, string> {
   return hints;
 }
 
-export function buildSystemPrompt(sessionId: string, sourceHints?: Map<string, string>): string {
+export function buildSystemPrompt(sessionId: string, sourceHints?: Map<string, string>, isLayoutChange = false): string {
   const session = getSessionWithAnnotations(sessionId);
-  const pending = getPendingAnnotations(sessionId);
+  const allPending = getPendingAnnotations(sessionId);
+  // For layout changes, skip text feedback annotations — they distract from the layout task
+  const pending = isLayoutChange
+    ? allPending.filter(a => (a as any).kind === "rearrange" || (a as any).kind === "placement")
+    : allPending;
 
   const lines: string[] = [
     "You are an AI assistant in Agentation, a visual feedback toolbar.",
@@ -389,10 +393,25 @@ export function buildSystemPrompt(sessionId: string, sourceHints?: Map<string, s
       }
 
       lines.push(`- [${a.id}] "${a.comment}" on <${a.element}>`);
+
+      // Include structured rearrange/placement data when available
+      const rearrange = (ann as any).rearrange;
+      if (rearrange) {
+        const yDelta = Math.round(rearrange.currentRect.y - rearrange.originalRect.y);
+        const direction = yDelta < 0 ? "UP" : "DOWN";
+        lines.push(`  **Rearrange:** Move "${rearrange.label}" ${direction} by ${Math.abs(yDelta)}px`);
+        lines.push(`  Selector: \`${rearrange.selector}\``);
+        lines.push(`  Action: In the JSX, swap this element with its ${yDelta < 0 ? "previous" : "next"} sibling.`);
+      }
+
+      const placement = (ann as any).placement;
+      if (placement) {
+        lines.push(`  **Placement:** Insert a \`${placement.componentType}\` component (${placement.width}×${placement.height}px)`);
+      }
+
       if (resolvedSource) {
         lines.push(`  **Source: ${resolvedSource}**`);
         if (a.nearbyText) lines.push(`  Current text: "${a.nearbyText}"`);
-        // Pre-read source file so the model can edit immediately without a read_file call
         const snippet = preReadSourceLines(resolvedSource, a.nearbyText);
         if (snippet) {
           hasPreReadContent = true;
@@ -405,20 +424,28 @@ export function buildSystemPrompt(sessionId: string, sourceHints?: Map<string, s
     lines.push("");
   }
 
+  // Action-type-specific workflow instructions
   lines.push("## Workflow");
   if (hasPreReadContent) {
     lines.push("File content is included above — do NOT call read_file, go straight to editing.");
-    lines.push("1. edit_file with exact old_string/new_string");
-    lines.push("2. resolve_annotation with the annotation ID");
+    lines.push("1. edit_file with old_string/new_string (indentation mismatches are auto-corrected)");
+    lines.push("2. resolve_annotation with the annotation ID and a brief summary");
   } else {
-    lines.push("Source files are resolved above. Do not search or explore.");
     lines.push("1. read_file with the Source path (auto-centers on the right line)");
-    lines.push("2. edit_file with exact old_string/new_string");
-    lines.push("3. resolve_annotation with the annotation ID");
+    lines.push("2. edit_file with old_string/new_string (indentation mismatches are auto-corrected)");
+    lines.push("3. resolve_annotation with the annotation ID and a brief summary");
   }
-  lines.push("ONLY edit what the annotation/request asks for — do not fix other text or make additional changes.");
-  lines.push("For layout changes: the Page URL maps to a source file (e.g. '/' → 'page.tsx', '/about' → 'about/page.tsx'). Use grep_code with the CSS selector text to find the file fast.");
-  lines.push("Keep responses to 1 sentence.");
+
+  lines.push("");
+  lines.push("## Rules");
+  lines.push("- Annotations are DESIGN FEEDBACK — interpret the comment as intent, not literal replacement text.");
+  lines.push("- The new_string MUST differ from old_string and produce a visible, meaningful change.");
+  lines.push("- ONLY edit the code targeted by the annotation — no other changes.");
+  lines.push("- If the annotation says to remove/delete something, set new_string to empty string.");
+  lines.push("- For text edits (typos, copy changes): change only the specific text mentioned.");
+  lines.push("- For design feedback (styling, brand, layout): modify CSS/style properties to address the intent.");
+  lines.push("- For layout changes: the Page URL maps to a source file (e.g. '/' → 'page.tsx'). Use grep_code to find the file.");
+  lines.push("- Keep responses to 1 sentence.");
 
   return lines.join("\n");
 }
@@ -450,6 +477,7 @@ const TOOL_LABELS: Record<string, string> = {
   grep_code: "Searching code",
   read_file: "Reading file",
   edit_file: "Editing file",
+  write_file: "Creating file",
   list_files: "Listing files",
   resolve_annotation: "Resolving annotation",
 };
@@ -505,24 +533,62 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
       const path = filePath.startsWith("/") ? filePath : resolve(projectRoot, filePath);
       const oldStr = input.old_string as string;
       const newStr = input.new_string as string;
+      if (!oldStr || typeof newStr !== "string") return `Error: old_string and new_string are both required.`;
+      if (oldStr === newStr) return `Error: old_string and new_string are identical — no change would be made.`;
       try {
         const content = await readFile(path, "utf-8");
-        const count = content.split(oldStr).length - 1;
-        if (count === 0) {
-          // Help the model self-correct: show what's actually in the file
-          const lines = content.split("\n");
-          const searchSnippet = oldStr.split("\n")[0].trim().slice(0, 30);
-          const matchIdx = lines.findIndex(l => l.includes(searchSnippet));
-          if (matchIdx >= 0) {
-            const context = lines.slice(Math.max(0, matchIdx - 2), matchIdx + 5)
-              .map((l, i) => `${Math.max(1, matchIdx - 1) + i}\t${l}`).join("\n");
-            return `old_string not found exactly. Closest match near line ${matchIdx + 1}:\n${context}`;
-          }
-          return `old_string not found in ${filePath}`;
+
+        // Layer 1: Exact match
+        const exactCount = content.split(oldStr).length - 1;
+        if (exactCount === 1) {
+          await writeFile(path, content.replace(oldStr, newStr), "utf-8");
+          return `Edited ${filePath}`;
         }
-        if (count > 1) return `old_string found ${count} times — must be unique. Add more surrounding context.`;
-        await writeFile(path, content.replace(oldStr, newStr), "utf-8");
-        return `Edited ${filePath}`;
+        if (exactCount > 1) return `old_string found ${exactCount} times — must be unique. Add more context.`;
+
+        // Layer 2: Indent-adjusted match (Aider-inspired)
+        // Strip leading whitespace per line, find the match, adjust new_string indent
+        const oldLines = oldStr.split("\n");
+        const contentLines = content.split("\n");
+        const strippedOld = oldLines.map(l => l.trimStart());
+
+        let matchStart = -1;
+        let matchCount = 0;
+        for (let i = 0; i <= contentLines.length - oldLines.length; i++) {
+          let found = true;
+          for (let j = 0; j < oldLines.length; j++) {
+            if (contentLines[i + j].trimStart() !== strippedOld[j]) { found = false; break; }
+          }
+          if (found) { matchCount++; if (matchStart < 0) matchStart = i; }
+        }
+
+        if (matchCount === 1) {
+          const actualOld = contentLines.slice(matchStart, matchStart + oldLines.length).join("\n");
+          // Compute indent delta between model's old_string and actual file content
+          const oldIndent = oldLines[0].length - oldLines[0].trimStart().length;
+          const fileIndent = contentLines[matchStart].length - contentLines[matchStart].trimStart().length;
+          const delta = fileIndent - oldIndent;
+          const adjustedNew = delta === 0 ? newStr : newStr.split("\n").map(line => {
+            if (line.length === 0) return line;
+            if (delta > 0) return " ".repeat(delta) + line;
+            // delta < 0: remove leading spaces (but not below 0)
+            const spaces = line.match(/^ */)?.[0].length ?? 0;
+            return " ".repeat(Math.max(0, spaces + delta)) + line.trimStart();
+          }).join("\n");
+          await writeFile(path, content.replace(actualOld, adjustedNew), "utf-8");
+          return `Edited ${filePath}`;
+        }
+        if (matchCount > 1) return `old_string found ${matchCount} times (indent-adjusted) — add more context.`;
+
+        // No match — show closest match for self-correction
+        const searchSnippet = oldStr.split("\n")[0].trim().slice(0, 30);
+        const matchIdx = contentLines.findIndex(l => l.includes(searchSnippet));
+        if (matchIdx >= 0) {
+          const context = contentLines.slice(Math.max(0, matchIdx - 2), matchIdx + 5)
+            .map((l, i) => `${Math.max(1, matchIdx - 1) + i}\t${l}`).join("\n");
+          return `old_string not found. Closest match near line ${matchIdx + 1}:\n${context}`;
+        }
+        return `old_string not found in ${filePath}`;
       } catch { return `Error editing ${filePath}`; }
     }
 
@@ -536,6 +602,26 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
           .filter(e => !e.name.startsWith(".") && e.name !== "node_modules")
           .map(e => `${e.isDirectory() ? "📁" : "📄"} ${e.name}`).join("\n");
       } catch { return `Error listing ${input.directory || "."}`; }
+    }
+
+    case "write_file": {
+      const filePath = input.file_path as string;
+      const content = input.content as string;
+      if (!filePath || typeof content !== "string") return `Error: file_path and content are both required.`;
+      const path = filePath.startsWith("/") ? filePath : resolve(projectRoot, filePath);
+      // Guard: refuse to overwrite existing files — use edit_file instead
+      if (existsSync(path)) {
+        return `Error: ${filePath} already exists. Use edit_file to modify existing files, not write_file.`;
+      }
+      // Guard: content must be a valid component file
+      if (content.length < 50 || (!content.includes("export") && !content.includes("module.exports"))) {
+        return `Error: write_file is for creating complete files, not text snippets. Use edit_file instead.`;
+      }
+      try {
+        mkdirSync(dirname(path), { recursive: true });
+        await writeFile(path, content, "utf-8");
+        return `Created ${filePath}`;
+      } catch (err) { return `Error creating ${filePath}: ${err instanceof Error ? err.message : "unknown"}`; }
     }
 
     case "resolve_annotation": {
@@ -612,6 +698,20 @@ const ANTHROPIC_TOOLS = [
   },
 ];
 
+// write_file is ONLY available for wireframe creation — kept separate to prevent accidental file overwrites
+const WRITE_FILE_TOOL = {
+  name: "write_file",
+  description: "Create a new file with the given content. Only for creating new pages — fails if file already exists.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      file_path: { type: "string", description: "Path relative to project root" },
+      content: { type: "string", description: "Full file content" },
+    },
+    required: ["file_path", "content"],
+  },
+};
+
 const OPENAI_TOOLS = ANTHROPIC_TOOLS.map(t => ({
   type: "function" as const,
   function: { name: t.name, description: t.description, parameters: t.input_schema },
@@ -655,11 +755,13 @@ async function streamAnthropic(sessionId: string, message: string, res: ServerRe
 
   // Parse source hints from enriched message to skip grep
   const sourceHints = parseSourceHints(message);
-  let systemPrompt = buildSystemPrompt(sessionId, sourceHints);
+  // Classify action type
+  const isLayoutChange = message.includes("layout changes") || message.includes("design changes");
+
+  let systemPrompt = buildSystemPrompt(sessionId, sourceHints, isLayoutChange);
+  const isDesignPlacement = message.includes("design changes") || message.includes("Design Layout") || message.includes("## Wireframe:");
 
   // For layout/design changes, pre-resolve the page file and include its content
-  const isLayoutChange = message.includes("layout changes") || message.includes("design changes");
-  const isDesignPlacement = message.includes("design changes") || message.includes("Design Layout");
   if (isLayoutChange) {
     const urlMatch = message.match(/Page URL:\s*(.+)/);
     if (urlMatch) {
@@ -669,96 +771,144 @@ async function streamAnthropic(sessionId: string, message: string, res: ServerRe
           const content = readFileSync(resolve(projectRoot, pageFile), "utf-8");
           const allLines = content.split("\n");
 
-          // For design placements, show the full component return JSX
           if (isDesignPlacement) {
-            // Find the return statement to show the JSX structure
-            const returnIdx = allLines.findIndex(l => l.includes("return (") || l.includes("return("));
-            const start = returnIdx > 0 ? returnIdx : 0;
-            // Show 100 lines from return — enough to see the page structure
-            const end = Math.min(allLines.length, start + 100);
-            const snippet = allLines.slice(start, end).map((l, i) => `${start + i + 1}\t${l}`).join("\n");
+            const isWireframe = message.includes("## Wireframe:");
 
-            systemPrompt += `\n\n## Source File: ${pageFile} (lines ${start + 1}-${end})`;
-            systemPrompt += `\n\`\`\`tsx\n${snippet}\n\`\`\``;
+            if (isWireframe) {
+              // Wireframe: create a NEW file — determine the route path
+              const pageDir = dirname(pageFile);
+              const newRoute = `${pageDir}/wireframe/page.tsx`;
+              systemPrompt += `\n\n## Wireframe Instructions`;
+              systemPrompt += `\nCreate a NEW page file at \`${newRoute}\` using write_file.`;
+              systemPrompt += `\nGenerate a complete React component (with "use client" if needed, imports, and export default).`;
+              systemPrompt += `\nUse the Layout Analysis rows from the wireframe to determine the grid/flex structure.`;
+              systemPrompt += `\n- The outer wrapper MUST have: position fixed, inset 0, background #fff (or #fdfdfc), z-index 1000, overflow auto. This covers the parent layout's nav/sidebar.`;
+              systemPrompt += `\n- Use semantic HTML elements (header, nav, main, aside, footer, section).`;
+              systemPrompt += `\n- Use inline styles for layout (flexbox/grid) matching the wireframe coordinates and sizes.`;
+              systemPrompt += `\n- Generate realistic placeholder content appropriate to each component type.`;
+              systemPrompt += `\n- Do NOT read the current page — this is a standalone wireframe.`;
+              systemPrompt += `\nUse write_file to create the file in a single call, then resolve all annotations.`;
+            } else {
+              // Design placement: insert into existing page
+              const returnIdx = allLines.findIndex(l => l.includes("return (") || l.includes("return("));
+              const start = returnIdx > 0 ? returnIdx : 0;
+              let end = allLines.length;
+              let depth = 0;
+              for (let i = start; i < allLines.length; i++) {
+                if (allLines[i].includes("return (") || allLines[i].includes("return(")) depth++;
+                if (depth > 0 && allLines[i].match(/^\s{0,4}\);?\s*$/)) { end = i + 1; break; }
+              }
+              if (end - start > 200) end = start + 200;
+              const snippet = allLines.slice(start, end).map((l, i) => `${start + i + 1}\t${l}`).join("\n");
 
-            systemPrompt += `\n\n## Design Placement Instructions`;
-            systemPrompt += `\nYou are ADDING new components to the page. Do NOT search for existing elements.`;
-            systemPrompt += `\nFor each component in the design output above:`;
-            systemPrompt += `\n- Generate appropriate JSX (e.g. Search → <input type="search" placeholder="Search..." style={{...}} />)`;
-            systemPrompt += `\n- Insert at the correct vertical position in the JSX based on the Y coordinate`;
-            systemPrompt += `\n- Style with inline styles or className matching the page's design system`;
-            systemPrompt += `\nFile: ${pageFile}. Edit directly — do NOT search or read_file.`;
-
-            log(`  +${Date.now() - t0}ms system prompt built (${systemPrompt.length} chars, preRead=${true}, layout=design-placement)`);
-
-            // Skip the rearrange logic below
-          }
-
-          // For placements, we're done — skip the rearrange logic
-          if (isDesignPlacement) {
-            // Already handled above
+              systemPrompt += `\n\n## Source File: ${pageFile} (lines ${start + 1}-${end})`;
+              systemPrompt += `\n\`\`\`tsx\n${snippet}\n\`\`\``;
+              systemPrompt += `\n\n## Design Placement Instructions`;
+              systemPrompt += `\nYou are inserting or positioning components in the page JSX above.`;
+              systemPrompt += `\nThe full page JSX is shown — find the right insertion point based on the Y coordinate.`;
+              systemPrompt += `\n- If the component already exists (e.g. <Footer />), adjust its position/styling instead of adding a duplicate.`;
+              systemPrompt += `\n- For new components: generate JSX with inline styles matching the page's design system.`;
+              systemPrompt += `\n- Insert at the correct vertical position in the JSX based on the Y coordinate.`;
+              systemPrompt += `\nFile: ${pageFile}. Edit directly — do NOT search or read_file.`;
+            }
           } else {
-          // Rearrange: find and move existing elements
-          const labelMatch = message.match(/Move (?:\w+)(?:: "(.+?)")?/);
-          const selectorMatch = message.match(/Selector:\s*`(.+?)`/);
+            // Rearrange: find the element to move in the source file
+            let targetLine = 0;
 
-          let targetLine = 0;
-          if (labelMatch?.[1]) {
-            // Search for the element's text content in source (first few words)
-            const searchText = labelMatch[1].slice(0, 20).replace(/\.\.\./g, "");
-            targetLine = allLines.findIndex(l => l.includes(searchText));
-          }
-          if (targetLine <= 0 && selectorMatch?.[1]) {
-            // Try searching for the tag from the selector (e.g. "section" or the nth-child pattern)
-            const parts = selectorMatch[1].split(" > ");
-            const lastPart = parts[parts.length - 1]; // e.g. "p:nth-child(3)"
-            const tagName = lastPart.replace(/:.*/, ""); // e.g. "p"
-            // Find the Nth occurrence of this tag
-            const nthMatch = lastPart.match(/:nth-child\((\d+)\)/);
-            if (nthMatch) {
-              const parentTag = parts.length > 1 ? parts[parts.length - 2].replace(/:.*/, "") : null;
-              let count = 0;
-              const nth = parseInt(nthMatch[1], 10);
-              for (let i = 0; i < allLines.length; i++) {
-                if (allLines[i].includes(`<${tagName}`) && (!parentTag || allLines.slice(Math.max(0, i - 20), i).some(l => l.includes(`<${parentTag}`)))) {
-                  count++;
-                  if (count === nth) { targetLine = i; break; }
+            // 0. Use structured annotation data from pending rearrange annotations
+            const rearrangeAnnotations = getPendingAnnotations(sessionId)
+              .filter(a => (a as any).rearrange);
+            for (const ra of rearrangeAnnotations) {
+              const r = (ra as any).rearrange;
+              if (r?.label) {
+                // Try className from selector (e.g. "div.animation-demo" → "animation-demo")
+                const classFromSelector = r.selector?.match(/\.([a-zA-Z][\w-]*)/);
+                if (classFromSelector) {
+                  const idx = allLines.findIndex((l: string) => l.includes(`className="${classFromSelector[1]}"`) || l.includes(`class="${classFromSelector[1]}"`));
+                  if (idx >= 0) { targetLine = idx; break; }
+                }
+                // Try the label's quoted text content
+                const quotedText = r.label?.match(/"([^"]+?)(?:\.\.\.)?"?/);
+                if (quotedText) {
+                  // Search for text fragments (skip JSX tags) — check if any line contains key words
+                  const words = quotedText[1].split(/\s+/).filter((w: string) => w.length > 3).slice(0, 3);
+                  if (words.length > 0) {
+                    const idx = allLines.findIndex((l: string) => words.every((w: string) => l.toLowerCase().includes(w.toLowerCase())));
+                    if (idx >= 0) { targetLine = idx; break; }
+                  }
                 }
               }
             }
-          }
 
-          // Find the parent section boundaries to include full context
-          let start = 0;
-          let end = Math.min(allLines.length, 80);
-
-          if (targetLine > 0) {
-            // Walk backward to find the opening of the parent section/component
-            start = targetLine;
-            let depth = 0;
-            for (let i = targetLine; i >= 0; i--) {
-              if (allLines[i].includes("</section") || allLines[i].includes("</div")) depth++;
-              if (allLines[i].match(/<section[\s>]/) || (depth > 0 && allLines[i].match(/<div[\s>]/))) {
-                depth--;
-                if (depth <= 0) { start = Math.max(0, i - 2); break; }
+            // 1. Try explicit Selector: `tag.class` from standard/detailed output
+            const selectorMatch = message.match(/Selector:\s*`(.+?)`/);
+            if (selectorMatch?.[1]) {
+              const classMatch = selectorMatch[1].match(/\.([a-zA-Z][\w-]*)/);
+              if (classMatch) {
+                targetLine = allLines.findIndex(l => l.includes(`className="${classMatch[1]}"`) || l.includes(`class="${classMatch[1]}"`));
               }
             }
-            // Walk forward to find the closing
-            end = Math.min(allLines.length, targetLine + 30);
-            for (let i = targetLine; i < allLines.length; i++) {
-              if (allLines[i].includes("</section>")) { end = Math.min(allLines.length, i + 3); break; }
-              if (i > targetLine + 80) { end = i; break; }
+
+            // 2. Try CSS selector patterns anywhere in message (e.g. div.animation-demo)
+            if (targetLine <= 0) {
+              const cssClasses = [...message.matchAll(/(?:^|[\s(])(?:div|section|span|p|h[1-6]|a|ul|ol|li|nav|header|footer|main|aside|article|form|button|input)\.([\w-]+)/g)];
+              for (const m of cssClasses) {
+                const idx = allLines.findIndex(l => l.includes(`className="${m[1]}"`) || l.includes(`class="${m[1]}"`));
+                if (idx >= 0) { targetLine = idx; break; }
+              }
             }
+
+            // 3. Try bold labels from output (e.g. **Animation demo** or **Paragraph: "Note: With MCP..."**)
+            if (targetLine <= 0) {
+              const boldLabels = [...message.matchAll(/\*\*(.+?)\*\*/g)].map(m => m[1]);
+              for (const label of boldLabels) {
+                // Extract quoted text content from labels like 'Paragraph: "Note: With MCP..."'
+                const quotedMatch = label.match(/"([^"]+?)(?:\.\.\.)?"?/);
+                const searchText = quotedMatch
+                  ? quotedMatch[1].trim()
+                  : label.slice(0, 30).replace(/\.\.\./g, "").trim();
+                if (searchText.length < 3) continue;
+                const idx = allLines.findIndex(l => l.toLowerCase().includes(searchText.toLowerCase()));
+                if (idx >= 0) { targetLine = idx; break; }
+              }
+            }
+
+            // Show enough context around the target for the model to cut/paste
+            let start = 0;
+            let end = Math.min(allLines.length, 80);
+            if (targetLine <= 0) {
+              // Target not found by text search — show the full return JSX so the model can find it
+              const returnIdx = allLines.findIndex(l => l.includes("return (") || l.includes("return("));
+              if (returnIdx > 0) {
+                start = returnIdx;
+                end = Math.min(allLines.length, start + 200);
+              }
+            } else if (targetLine > 0) {
+              // Walk backward to find the parent section/component boundary
+              start = targetLine;
+              let depth = 0;
+              for (let i = targetLine; i >= 0; i--) {
+                if (allLines[i].includes("</section") || allLines[i].includes("</div")) depth++;
+                if (allLines[i].match(/<section[\s>]/) || (depth > 0 && allLines[i].match(/<div[\s>]/))) {
+                  depth--;
+                  if (depth <= 0) { start = Math.max(0, i - 2); break; }
+                }
+              }
+              // Walk forward to find the closing
+              end = Math.min(allLines.length, targetLine + 30);
+              for (let i = targetLine; i < allLines.length; i++) {
+                if (allLines[i].includes("</section>")) { end = Math.min(allLines.length, i + 3); break; }
+                if (i > targetLine + 80) { end = i; break; }
+              }
+            }
+
+            const snippet = allLines.slice(start, end).map((l, i) => `${start + i + 1}\t${l}`).join("\n");
+            systemPrompt += `\n\n## Source File: ${pageFile} (lines ${start + 1}-${end})`;
+            systemPrompt += `\n\`\`\`tsx\n${snippet}\n\`\`\``;
+            systemPrompt += `\n\nThe element to move is at line ${targetLine > 0 ? targetLine + 1 : "unknown"}.`;
+            systemPrompt += `\nUse edit_file on ${pageFile} — cut the element JSX and paste at the new position.`;
+            systemPrompt += `\nDo NOT search, grep, or read_file. Edit directly from the content above.`;
           }
-
-          const snippet = allLines.slice(start, end).map((l, i) => `${start + i + 1}\t${l}`).join("\n");
-
-          systemPrompt += `\n\n## Source File: ${pageFile} (lines ${start + 1}-${end})`;
-          systemPrompt += `\n\`\`\`tsx\n${snippet}\n\`\`\``;
-          systemPrompt += `\n\nThe element to move is at line ${targetLine > 0 ? targetLine + 1 : "unknown"}.`;
-          systemPrompt += `\nUse edit_file on ${pageFile} — cut the element JSX and paste at the new position.`;
-          systemPrompt += `\nDo NOT search, grep, or read_file. Edit directly from the content above.`;
-          } // end rearrange else
         } catch (err) {
           log(`  Layout pre-read failed: ${err instanceof Error ? err.message : err}`);
         }
@@ -767,44 +917,51 @@ async function streamAnthropic(sessionId: string, message: string, res: ServerRe
   }
 
   const hasPreRead = systemPrompt.includes("do NOT call read_file") || isLayoutChange;
+  const maxSteps = isLayoutChange ? 8 : 6;
   log(`  +${Date.now() - t0}ms system prompt built (${systemPrompt.length} chars, preRead=${hasPreRead}, hints=${sourceHints.size}, layout=${isLayoutChange})`);
 
-  const messages = history.map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+  // Layout changes are self-contained — don't include prior conversation history
+  // which may contain stale text edit messages that confuse the model
+  const messages = isLayoutChange
+    ? [{ role: "user" as const, content: message }]
+    : history.map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
 
   startSSE(res);
 
   let hadToolUse = false;
+  let hasEdited = false;
+  let createdPageUrl: string | null = null;
   let fullAssistantText = "";
 
-  const maxSteps = isLayoutChange ? 8 : 6;
+  const isWireframe = isDesignPlacement && message.includes("## Wireframe:");
 
   for (let step = 0; step < maxSteps; step++) {
-    const stepStart = Date.now();
-
-    // Two-model strategy: Haiku for exploration/planning, Sonnet for code edits
     // Step 0 with pre-read: force tool_choice to skip preamble
     const useToolChoice = step === 0 && hasPreRead;
 
-    // Model selection per step:
-    // - Text annotations: always Haiku (fast)
-    // - Layout/design: Haiku for read/grep steps, Sonnet for edit steps
-    const needsCodeGen = isLayoutChange && step > 0;
-    const model = needsCodeGen ? "claude-sonnet-4-6" : "claude-haiku-4-5-20251001";
+    log(`  Step ${step + 1}: calling API (claude-sonnet-4-6)...`);
 
-    log(`  Step ${step + 1}: calling API (${model})...`);
+    // Gate resolve behind hasEdited; limit tools based on action type
+    const tools = isWireframe
+      ? [WRITE_FILE_TOOL, ...ANTHROPIC_TOOLS.filter(t => t.name === "resolve_annotation" && hasEdited)]
+      : ANTHROPIC_TOOLS.filter(t => {
+          if (t.name === "resolve_annotation") return hasEdited;
+          if (hasPreRead && step === 0 && !isLayoutChange) return t.name === "edit_file";
+          return true;
+        });
 
-    // Non-layout pre-read: only send edit + resolve tools (fewer tokens)
-    const tools = (hasPreRead && step === 0 && !isLayoutChange)
-      ? ANTHROPIC_TOOLS.filter(t => t.name === "edit_file" || t.name === "resolve_annotation")
-      : ANTHROPIC_TOOLS;
+    // For wireframes step 0, force write_file to skip exploration
+    const toolChoice = isWireframe && step === 0
+      ? { type: "tool" as const, name: "write_file" }
+      : useToolChoice ? { type: "any" as const } : undefined;
 
     const stream = client.messages.stream({
-      model,
-      max_tokens: needsCodeGen ? 2048 : 512,
+      model: "claude-sonnet-4-6",
+      max_tokens: isDesignPlacement ? 4096 : 2048,
       system: systemPrompt,
       messages,
       tools,
-      ...(useToolChoice ? { tool_choice: { type: "any" as const } } : {}),
+      ...(toolChoice ? { tool_choice: toolChoice } : {}),
     });
 
     if (hadToolUse) { writeSSE(res, { type: "message_break" }); hadToolUse = false; }
@@ -835,6 +992,12 @@ async function streamAnthropic(sessionId: string, message: string, res: ServerRe
     let justResolved = false;
 
     for (const tu of toolUses) {
+      // Hard block: write_file is ONLY allowed for wireframe creation
+      if (tu.name === "write_file" && !isWireframe) {
+        toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: `Error: write_file is not available. Use edit_file to modify existing files.` });
+        log(`  +${Date.now() - t0}ms BLOCKED write_file (not a wireframe request)`);
+        continue;
+      }
       const label = TOOL_LABELS[tu.name] || tu.name;
       const toolStart = Date.now();
       writeSSE(res, { type: "tool_use", name: label, input: tu.input });
@@ -845,12 +1008,29 @@ async function streamAnthropic(sessionId: string, message: string, res: ServerRe
 
       const rawResult = await executeTool(tu.name, tu.input);
       const maxLen = tu.name === "read_file" ? 1500 : tu.name === "grep_code" ? 1000 : 3000;
-      const result = rawResult.length > maxLen
-        ? rawResult.slice(0, maxLen) + `\n... (truncated)`
-        : rawResult;
+      const result = rawResult.length > maxLen ? rawResult.slice(0, maxLen) + "\n... (truncated)" : rawResult;
 
-      if (tu.name === "edit_file") {
-        log(`  +${Date.now() - t0}ms edit_file: "${(tu.input.old_string as string)?.slice(0, 50)}" → "${(tu.input.new_string as string)?.slice(0, 50)}" = ${rawResult} [${Date.now() - toolStart}ms]`);
+      if (tu.name === "edit_file" || tu.name === "write_file") {
+        if (rawResult.startsWith("Edited ") || rawResult.startsWith("Created ")) hasEdited = true;
+        // Track new page URL for CTA
+        if (tu.name === "write_file" && rawResult.startsWith("Created ")) {
+          const filePath = tu.input.file_path as string;
+          const routeMatch = filePath.match(/app\/(.+?)\/page\.\w+$/);
+          if (routeMatch) {
+            const origin = message.match(/Page URL:\s*(https?:\/\/[^/\s]+)/)?.[1] || "http://localhost:3000";
+            createdPageUrl = `${origin}/${routeMatch[1]}`;
+          }
+          // Auto-resolve all pending placement annotations — no need for model to do it
+          if (isWireframe) {
+            const placements = getPendingAnnotations(sessionId).filter(a => (a as any).kind === "placement");
+            for (const p of placements) {
+              updateAnnotationStatus(p.id, "resolved", "agent");
+              log(`  +${Date.now() - t0}ms auto-resolved ${p.id}`);
+            }
+            justResolved = true;
+          }
+        }
+        log(`  +${Date.now() - t0}ms ${tu.name}: ${rawResult} [${Date.now() - toolStart}ms]`);
       } else {
         log(`  +${Date.now() - t0}ms ${tu.name}(${JSON.stringify(tu.input).slice(0, 60)}) → ${rawResult.length} chars [${Date.now() - toolStart}ms]`);
       }
@@ -862,7 +1042,6 @@ async function streamAnthropic(sessionId: string, message: string, res: ServerRe
 
     messages.push({ role: "user", content: toolResults as any });
 
-    // Skip the final "done" API call if we just resolved
     if (justResolved) {
       writeSSE(res, { type: "message_break" });
       const resolveResult = toolResults.find(tr =>
@@ -873,13 +1052,27 @@ async function streamAnthropic(sessionId: string, message: string, res: ServerRe
     }
   }
 
+  // Mandatory resolve on exhaustion — notify the UI instead of silently dropping
+  if (!fullAssistantText.includes("Resolved") && !hasEdited) {
+    writeSSE(res, { type: "text_delta", text: "\n\nCould not complete this edit — the annotation remains pending for manual review." });
+  }
+
   if (fullAssistantText) history.push({ role: "assistant", content: fullAssistantText });
+
+  // Clear history after wireframe creation so subsequent text edits don't see write_file in history
+  if (isWireframe && hasEdited) {
+    conversationHistory.delete(sessionId);
+  }
 
   log(`━━━ Chat complete: ${Date.now() - t0}ms total ━━━`);
 
-  writeSSE(res, { type: "complete" });
+  writeSSE(res, { type: "complete", ...(createdPageUrl ? { url: createdPageUrl } : {}) });
   eventBus.emit("agent.stopped", sessionId, {
-    event: "stopped", summary: "Finished", active: false, timestamp: new Date().toISOString(),
+    event: "stopped",
+    summary: createdPageUrl ? "Page created" : "Finished",
+    active: false,
+    timestamp: new Date().toISOString(),
+    ...(createdPageUrl ? { url: createdPageUrl } : {}),
   });
 
   if (!res.writableEnded) res.end();
@@ -894,20 +1087,27 @@ async function streamOpenAI(sessionId: string, message: string, res: ServerRespo
   const history = getHistory(sessionId);
   history.push({ role: "user", content: message });
 
+  const sourceHints = parseSourceHints(message);
   const messages: Array<Record<string, unknown>> = [
-    { role: "system", content: buildSystemPrompt(sessionId) },
+    { role: "system", content: buildSystemPrompt(sessionId, sourceHints) },
     ...history.map(m => ({ role: m.role, content: m.content })),
   ];
 
   startSSE(res);
   let hadToolUse = false;
+  let hasEdited = false;
   let fullAssistantText = "";
 
   for (let step = 0; step < 6; step++) {
     if (hadToolUse) { writeSSE(res, { type: "message_break" }); hadToolUse = false; }
 
+    // Gate resolve behind hasEdited
+    const tools = hasEdited
+      ? OPENAI_TOOLS
+      : OPENAI_TOOLS.filter(t => t.function.name !== "resolve_annotation");
+
     const stream = await client.chat.completions.create({
-      model: "gpt-4o", messages: messages as any, tools: OPENAI_TOOLS, stream: true,
+      model: "gpt-4o", messages: messages as any, tools, stream: true,
     });
 
     let stepText = "";
@@ -959,6 +1159,7 @@ async function streamOpenAI(sessionId: string, message: string, res: ServerRespo
       });
 
       const rawResult = await executeTool(tc.name, input);
+      if ((tc.name === "edit_file" || tc.name === "write_file") && (rawResult.startsWith("Edited ") || rawResult.startsWith("Created "))) hasEdited = true;
       const maxLen = tc.name === "read_file" ? 1500 : tc.name === "grep_code" ? 1000 : 3000;
       const result = rawResult.length > maxLen ? rawResult.slice(0, maxLen) + "\n... (truncated)" : rawResult;
       messages.push({ role: "tool", tool_call_id: tc.id, content: result });
@@ -970,6 +1171,11 @@ async function streamOpenAI(sessionId: string, message: string, res: ServerRespo
       writeSSE(res, { type: "message_break" });
       break;
     }
+  }
+
+  // Mandatory resolve on exhaustion
+  if (!fullAssistantText.includes("Resolved") && !hasEdited) {
+    writeSSE(res, { type: "text_delta", text: "\n\nCould not complete this edit — the annotation remains pending for manual review." });
   }
 
   if (fullAssistantText) history.push({ role: "assistant", content: fullAssistantText });

@@ -225,7 +225,7 @@ export default function AgentationDocs() {
         </Link>
         <header style={{ position: 'relative' }}>
           <InstallSnippet />
-          <h1 style={{ fontSize: '2rem', lineHeight: 1.15, marginBottom: '0.5rem' }}><span className="sketchy-underline">Point at bugs.</span><br />Let AI <span className="pen-underline">fix them.</span></h1>
+          <h1 style={{ fontSize: '2rem', lineHeight: 1.15, marginBottom: '0.5rem' }}><span className="sketchy-underline">Point at issues.</span><br />Let AI <span className="pen-underline">sort them.</span></h1>
           <p className="tagline">A floating toolbar that turns your design feedback into structured context for AI coding agents. Annotate any element, and let Claude Code, Cursor, or any AI tool act on it.</p>
         </header>
 
@@ -294,7 +294,7 @@ export default function AgentationDocs() {
             />
 
             <div className="demo-card">
-              <h3>Example Card</h3>
+              <h3>Test Card</h3>
               <p>
                 Click on this card or select this text to create an annotation.
                 The output will include the element path and your feedback.

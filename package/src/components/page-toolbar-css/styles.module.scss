@@ -673,6 +673,30 @@
     }
   }
 
+  // Below toolbar: used when design/layout panel is open
+  &.belowToolbar {
+    top: calc(100% + 14px);
+    right: 0;
+    animation: slideUp 0.2s cubic-bezier(0.19, 1, 0.22, 1) both;
+
+    &::after {
+      content: "";
+      position: absolute;
+      bottom: calc(100% - 4px);
+      right: 16px;
+      transform: rotate(45deg);
+      width: 8px;
+      height: 8px;
+      background: #1a1a1a;
+      border-radius: 2px 0 0 0;
+    }
+  }
+
+  // Clickable variant (e.g. "View page →")
+  &.clickable {
+    pointer-events: auto;
+  }
+
   &.exiting {
     animation: slideDown 0.15s ease both;
 
@@ -687,6 +711,10 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 
     &.onToolbar::after {
+      background: #f0f0f0;
+    }
+
+    &.belowToolbar::after {
       background: #f0f0f0;
     }
   }

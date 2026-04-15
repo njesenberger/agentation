@@ -605,6 +605,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     summary: string;
     tool_name?: string;
     event?: string;
+    url?: string;
   } | null>(null);
   const [showActivityLabel, setShowActivityLabel] = useState(false);
   const [activityLabelExiting, setActivityLabelExiting] = useState(false);
@@ -1160,14 +1161,19 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
     const agentStoppedHandler = (e: MessageEvent) => {
       try {
-        JSON.parse(e.data); // validate
+        const data = JSON.parse(e.data);
+        const pageUrl = data?.payload?.url;
         prevSummaryRef.current = null;
 
         // Reset progress on stop
         setAgentProgress(null);
 
-        // Show "Finished" with longer display (8s), then fade
-        setAgentActivity({ active: false, summary: "Finished" });
+        // Show "Finished" (or "View page →" with URL) with longer display, then fade
+        setAgentActivity({
+          active: false,
+          summary: pageUrl ? "View page →" : "Finished",
+          url: pageUrl || undefined,
+        });
         setShowActivityLabel(true);
 
         if (activityLabelTimeoutRef.current) clearTimeout(activityLabelTimeoutRef.current);
@@ -3632,7 +3638,22 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             }).then(async (resp) => {
               if (!resp.ok) { setAgentActivity(null); setShowActivityLabel(false); return; }
               const reader = resp.body?.getReader();
-              if (reader) { while (true) { const { done } = await reader.read(); if (done) break; } }
+              const decoder = new TextDecoder();
+              let buffer = "";
+              if (reader) {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  buffer += decoder.decode(value, { stream: true });
+                }
+              }
+              // Check for created page URL in the SSE stream — auto-navigate
+              const urlMatch = buffer.match(/"type"\s*:\s*"complete"[^}]*"url"\s*:\s*"([^"]+)"/);
+              if (urlMatch) {
+                setAgentActivity({ active: false, summary: "Opening page...", url: urlMatch[1] });
+                // Brief delay so the user sees the transition, then navigate
+                originalSetTimeout(() => { window.location.href = urlMatch[1]; }, 800);
+              }
             }).catch(() => { setAgentActivity(null); setShowActivityLabel(false); });
             return;
           }
@@ -3848,7 +3869,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             {/* Agent activity label - shown on collapsed FAB */}
             {!isActive && showActivityLabel && agentActivity?.summary && (
               <span
-                className={`${styles.agentActivityLabel} ${styles.onFab} ${!isDarkMode ? styles.light : ""} ${activityLabelExiting ? styles.exiting : ""} ${activityLabelSwapping ? styles.swapping : ""} ${agentActivity.event === "error" ? styles.error : ""}`}
+                className={`${styles.agentActivityLabel} ${styles.onFab} ${!isDarkMode ? styles.light : ""} ${activityLabelExiting ? styles.exiting : ""} ${activityLabelSwapping ? styles.swapping : ""} ${agentActivity.event === "error" ? styles.error : ""} ${agentActivity.url ? styles.clickable : ""}`}
+                onClick={agentActivity.url ? () => { window.location.href = agentActivity!.url!; } : undefined}
+                style={agentActivity.url ? { cursor: "pointer" } : undefined}
               >
                 <span className={styles.agentActivityLabelText}>
                   {agentActivity.event === "tool_use" && <span className={styles.activityDot} />}
@@ -4069,7 +4092,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               )}
               {isActive && showActivityLabel && agentActivity?.summary && (
                 <span
-                  className={`${styles.agentActivityLabel} ${styles.onToolbar} ${!isDarkMode ? styles.light : ""} ${activityLabelExiting ? styles.exiting : ""} ${activityLabelSwapping ? styles.swapping : ""} ${agentActivity.event === "error" ? styles.error : ""}`}
+                  className={`${styles.agentActivityLabel} ${isDesignMode ? styles.belowToolbar : styles.onToolbar} ${!isDarkMode ? styles.light : ""} ${activityLabelExiting ? styles.exiting : ""} ${activityLabelSwapping ? styles.swapping : ""} ${agentActivity.event === "error" ? styles.error : ""} ${agentActivity.url ? styles.clickable : ""}`}
+                  onClick={agentActivity.url ? () => { window.location.href = agentActivity!.url!; } : undefined}
+                  style={agentActivity.url ? { cursor: "pointer" } : undefined}
                 >
                   <span className={styles.agentActivityLabelText}>
                     {agentActivity.event === "tool_use" && <span className={styles.activityDot} />}
@@ -4354,6 +4379,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
           deselectSignal={designDeselectSignal}
           clearSignal={designClearSignal}
           wireframe={blankCanvas}
+          building={blankCanvas && agentActivity?.active === true}
           onSelectionChange={(ids, isShift) => {
             designSelectedIdsRef.current = ids;
             if (!isShift) {

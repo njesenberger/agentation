@@ -28,6 +28,7 @@ type DesignModeProps = {
   onDragEnd?: (dx: number, dy: number, committed: boolean) => void;
   clearSignal?: number;
   wireframe?: boolean;
+  building?: boolean;
 };
 
 type HandleDir = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
@@ -141,6 +142,7 @@ export function DesignMode({
   onDragEnd,
   clearSignal,
   wireframe,
+  building,
 }: DesignModeProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [drawBox, setDrawBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
@@ -683,7 +685,7 @@ export function DesignMode({
         onMouseDown={handleOverlayMouseDown}
       >
         {/* Placed components */}
-        {placements.map((p) => {
+        {placements.map((p, idx) => {
           const isSelected = selectedIds.has(p.id);
           const label = COMPONENT_MAP[p.type]?.label || p.type;
           const screenY = p.y - scrollY;
@@ -692,10 +694,11 @@ export function DesignMode({
             <div
               key={p.id}
               data-design-placement={p.id}
-              className={`${styles.placement} ${isSelected ? styles.selected : ""} ${exitingIds.has(p.id) ? styles.exiting : ""}`}
+              className={`${styles.placement} ${isSelected ? styles.selected : ""} ${exitingIds.has(p.id) ? styles.exiting : ""} ${building ? styles.building : ""}`}
               style={{
                 left: p.x,
                 top: screenY,
+                ...(building ? { animationDelay: `${idx * 0.3}s` } : {}),
                 width: p.width,
                 height: p.height,
                 position: "fixed",
