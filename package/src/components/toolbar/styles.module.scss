@@ -107,13 +107,12 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
     color: #1a1a1a;
   }
 
-  &:disabled {
-    cursor: pointer;
+  .open & {
+    pointer-events: none;
   }
 }
 
 .toolbarMenuButtonIcon {
-  position: absolute;
   transition-property: transform, filter, opacity;
   transition-duration: $toolbar-duration;
   transition-timing-function: $toolbar-easing;
@@ -184,7 +183,7 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
     }
   }
 
-  &:active {
+  &:not(:disabled):active {
     transform: scale(0.92);
   }
 
@@ -210,6 +209,10 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
     }
   }
 
+  &.feedback {
+    pointer-events: none;
+  }
+
   &.hidden {
     margin: 0 -3px;
     width: 0;
@@ -220,7 +223,16 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
 
 .toolbarButtonIcon {
   position: absolute;
+  width: 24px;
+  height: 24px;
   max-width: none;
+  transition-property: transform, opacity;
+  transition-duration: 0.2s;
+
+  &.hidden {
+    transform: scale(0.8);
+    opacity: 0;
+  }
 }
 
 .toolbarButtonBadge {
@@ -228,8 +240,8 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
   justify-content: center;
   align-items: center;
   position: absolute;
-  top: 0;
-  right: 0;
+  top: -5px;
+  right: -5px;
   border: 2px solid #1a1a1a;
   border-radius: 9px;
   min-width: 18px;
@@ -253,9 +265,24 @@ $toolbar-easing: cubic-bezier(0.19, 1, 0.22, 1);
     opacity: 0;
     pointer-events: none;
   }
+}
 
-  .toolbarButton.hidden & {
-    transform: translateX(17px);
+.toolbarButtonStatus {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  box-shadow: 0 0 0 2px #1a1a1a;
+  transition-property: transform, opacity;
+  transition-duration: 0.2s;
+
+  [data-agentation-theme="light"] & {
+    box-shadow: 0 0 0 2px #fff;
+  }
+
+  &.hidden {
+    transform: scale(0.33);
+    opacity: 0;
+    pointer-events: none;
   }
 }
 

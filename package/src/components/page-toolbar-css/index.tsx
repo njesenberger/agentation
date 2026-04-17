@@ -13,20 +13,6 @@ import {
   AnnotationPopupCSS,
   AnnotationPopupCSSHandle,
 } from "../annotation-popup-css";
-import {
-  IconListSparkle,
-  IconGear,
-  IconCopyAnimated,
-  IconSendArrow,
-  IconTrashAlt,
-  IconEyeAnimated,
-  IconPausePlayAnimated,
-  IconXmarkLarge,
-  IconEdit,
-  IconChevronLeft,
-  IconChevronRight,
-  IconLayout,
-} from "../icons";
 import { HelpTooltip } from "../help-tooltip";
 import { DesignMode } from "../design-mode";
 import { DesignPalette } from "../design-mode/palette";
@@ -468,11 +454,6 @@ export function PageFeedbackToolbarCSS({
     // Element reference for single-select (for live position queries)
     targetElement?: HTMLElement;
   } | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [sendState, setSendState] = useState<
-    "idle" | "sending" | "sent" | "failed"
-  >("idle");
-  const [cleared, setCleared] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [hoveredMarkerId, setHoveredMarkerId] = useState<string | null>(null);
   const [hoveredTargetElement, setHoveredTargetElement] =
@@ -3114,7 +3095,6 @@ export function PageFeedbackToolbarCSS({
     }
 
     setIsClearing(true);
-    setCleared(true);
 
     // Clear draw strokes
     setDrawStrokes([]);
@@ -3145,8 +3125,6 @@ export function PageFeedbackToolbarCSS({
       localStorage.removeItem(getStorageKey(pathname));
       setIsClearing(false);
     }, totalAnimationTime);
-
-    originalSetTimeout(() => setCleared(false), 1500);
   }, [
     pathname,
     annotations,
@@ -3362,12 +3340,12 @@ export function PageFeedbackToolbarCSS({
     // Fire callback with markdown output (always, regardless of clipboard success)
     onCopy?.(output);
 
-    setCopied(true);
-    originalSetTimeout(() => setCopied(false), 2000);
+    // setCopied(true);
+    // originalSetTimeout(() => setCopied(false), 2000);
 
-    if (settings.autoClearAfterCopy) {
-      originalSetTimeout(() => clearAll(), 500);
-    }
+    // if (settings.autoClearAfterCopy) {
+    //   originalSetTimeout(() => clearAll(), 500);
+    // }
   }, [
     annotations,
     drawStrokes,
@@ -3433,18 +3411,12 @@ export function PageFeedbackToolbarCSS({
       onSubmit(output, annotations);
     }
 
-    // Start sending (arrow fades)
-    setSendState("sending");
-
-    // Brief delay for the fade effect
-    await new Promise((resolve) => originalSetTimeout(resolve, 150));
-
     // Fire webhook and check result (force=true to bypass webhooksEnabled check for manual sends)
     const success = await fireWebhook("submit", { output, annotations }, true);
 
-    // Show result
-    setSendState(success ? "sent" : "failed");
-    originalSetTimeout(() => setSendState("idle"), 2500);
+    if (!success) {
+      throw new Error("Webhook failed");
+    }
 
     // Clear annotations if send succeeded and autoClearAfterCopy is enabled
     if (success && settings.autoClearAfterCopy) {
@@ -3733,7 +3705,10 @@ export function PageFeedbackToolbarCSS({
       if (e.key === "s" || e.key === "S") {
         const hasValidWebhook =
           isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "");
-        if (annotations.length > 0 && hasValidWebhook && sendState === "idle") {
+        if (
+          annotations.length > 0 &&
+          hasValidWebhook /*&& sendState === "idle"*/
+        ) {
           e.preventDefault();
           hideTooltipsUntilMouseLeave();
           sendToWebhook();
@@ -3754,7 +3729,6 @@ export function PageFeedbackToolbarCSS({
     annotations.length,
     settings.webhookUrl,
     webhookUrl,
-    sendState,
     sendToWebhook,
     toggleFreeze,
     copyOutput,
@@ -3764,8 +3738,6 @@ export function PageFeedbackToolbarCSS({
 
   if (!mounted) return null;
   if (isToolbarHidden) return null;
-
-  const hasAnnotations = annotations.length > 0;
 
   // Filter annotations for rendering (exclude exiting ones from normal flow)
   const visibleAnnotations = annotations.filter(
@@ -3825,87 +3797,6 @@ export function PageFeedbackToolbarCSS({
     return styles;
   };
 
-  // const toolbarB.uttons: ToolbarButto.nProps[] = [
-  //   {
-  //     title: isFrozen ? "Resume animations" : "Pause animations",
-  //     shortcut: "P",
-  //     icon: <IconPausePlayAnimated size={24} isPaused={false} />,
-  //     activeIcon: <IconPausePlayAnimated size={24} isPaused={true} />,
-  //     active: isFrozen,
-  //     onClick: () => {
-  //       hideTooltipsUntilMouseLeave();
-  //       toggleFreeze();
-  //     },
-  //   },
-  //   {
-  //     title: isDesignMode ? "Exit layout mode" : "Layout mode",
-  //     shortcut: "L",
-  //     icon: <IconLayout />,
-  //     active: isDesignMode,
-  //     onClick: () => {
-  //       hideTooltipsUntilMouseLeave();
-  //       if (isDrawMode) setIsDrawMode(false);
-  //       if (showSettings) setShowSettings(false);
-  //       if (pendingAnnotation) cancelAnnotation();
-  //       isDesignMode ? closeDesignMode() : setIsDesignMode(true);
-  //     },
-  //   },
-  //   {
-  //     title: showMarkers ? "Hide markers" : "Show markers",
-  //     shortcut: "H",
-  //     icon: <IconEyeAnimated size={24} isOpen={showMarkers} />,
-  //     disabled: !hasAnnotations || isDesignMode,
-  //     onClick: () => {
-  //       hideTooltipsUntilMouseLeave();
-  //       setShowMarkers(!showMarkers);
-  //     },
-  //   },
-  //   {
-  //     title: isDesignMode && blankCanvas ? "Copy layout" : "Copy feedback",
-  //     shortcut: "C",
-  //     icon: <IconCopyAnimated size={24} copied={false} />,
-  //     activeIcon: <IconCopyAnimated size={24} copied={true} />,
-  //     active: copied,
-  //     disabled:
-  //       !hasAnnotations &&
-  //       drawStrokes.length === 0 &&
-  //       designPlacements.length === 0,
-  //     onClick: copyOutput,
-  //   },
-  //   {
-  //     title: "Send Annotations",
-  //     shortcut: "S",
-  //     icon: <IconSendArrow size={24} state="idle" />,
-  //     successIcon: <IconSendArrow size={24} state="sent" />,
-  //     errorIcon: <IconSendArrow size={24} state="failed" />,
-  //     hidden: !(
-  //       !settings.webhooksEnabled &&
-  //       isValidUrl(settings.webhookUrl || webhookUrl || "")
-  //     ),
-  //     disabled: !hasAnnotations || sendState === "sending",
-  //     onClick: sendToWebhook,
-  //   },
-  //   {
-  //     title: "Clear all",
-  //     shortcut: "X",
-  //     icon: <IconTrashAlt size={24} />,
-  //     disabled:
-  //       !hasAnnotations &&
-  //       drawStrokes.length === 0 &&
-  //       designPlacements.length === 0,
-  //     onClick: clearAll,
-  //   },
-  //   {
-  //     title: "Settings",
-  //     icon: <IconGear size={24} />,
-  //     onClick: () => {
-  //       hideTooltipsUntilMouseLeave();
-  //       if (isDesignMode) closeDesignMode();
-  //       setShowSettings(!showSettings);
-  //     },
-  //   },
-  // ];
-
   return createPortal(
     <div
       ref={portalWrapperRef}
@@ -3938,6 +3829,7 @@ export function PageFeedbackToolbarCSS({
         }}
         markersVisible={showMarkers}
         onToggleMarkers={() => setShowMarkers(!showMarkers)}
+        onCopy={copyOutput}
         onSendFeedback={sendToWebhook}
         sendFeedbackVisible={
           !settings.webhooksEnabled &&
@@ -3949,6 +3841,7 @@ export function PageFeedbackToolbarCSS({
           if (isDesignMode) closeDesignMode();
           setShowSettings(!showSettings);
         }}
+        mcpConnected={connectionStatus === "connected"}
       >
         <DesignPalette
           visible={isDesignMode && isActive}

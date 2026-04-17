@@ -15,7 +15,9 @@ export const Tooltip = ({
   const [position, setPosition] = useState({ top: 0, right: 0 });
   const triggerRef = useRef<HTMLSpanElement>(null);
   const timeoutRef = useRef<ReturnType<typeof originalSetTimeout> | null>(null);
-  const exitTimeoutRef = useRef<ReturnType<typeof originalSetTimeout> | null>(null);
+  const exitTimeoutRef = useRef<ReturnType<typeof originalSetTimeout> | null>(
+    null,
+  );
 
   const updatePosition = () => {
     if (triggerRef.current) {
@@ -74,6 +76,7 @@ export const Tooltip = ({
             data-feedback-toolbar
             style={{
               position: "fixed",
+              zIndex: 2147483647,
               top: position.top,
               right: position.right,
               transform: "translateY(-50%)",
@@ -86,7 +89,6 @@ export const Tooltip = ({
               borderRadius: "10px",
               width: "180px",
               textAlign: "left" as const,
-              zIndex: 100020,
               pointerEvents: "none" as const,
               boxShadow: "0px 1px 8px rgba(0, 0, 0, 0.28)",
               opacity: visible ? 1 : 0,
@@ -95,7 +97,7 @@ export const Tooltip = ({
           >
             {content}
           </div>,
-          document.body
+          document.body,
         )}
     </>
   );

@@ -1,0 +1,28 @@
+@keyframes pulse {
+  0%,
+  25% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+:where(.pulseDot) {
+  position: relative;
+  border-radius: 50%;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    border-radius: inherit;
+    width: inherit;
+    height: inherit;
+    background-color: inherit;
+    animation: pulse 2.75s infinite;
+  }
+}
