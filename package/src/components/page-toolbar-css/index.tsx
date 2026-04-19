@@ -21,9 +21,9 @@ import {
   IconChevronRight,
   IconLayout,
   IconHelp,
-  IconChatEllipsis,
 } from "../icons";
-import { ChatPanel, type ChatPanelHandle } from "./chat-panel";
+import { BubbleVariant } from "./chat-panel/variants/bubble";
+import { useCommandSend } from "./chat-panel/use-command-send";
 import { Tooltip } from "../tooltip";
 import { HelpTooltip } from "../help-tooltip";
 import { DesignMode } from "../design-mode";
@@ -435,8 +435,11 @@ export function PageFeedbackToolbarCSS({
   const [isFrozen, setIsFrozen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSettingsVisible, setShowSettingsVisible] = useState(false);
-  const [showChat, setShowChat] = useState(false);
-  const [showChatVisible, setShowChatVisible] = useState(false);
+  const [showBubble, setShowBubble] = useState(false);
+  const [bubbleCapturedElement, setBubbleCapturedElement] = useState<
+    { name: string; path: string } | null
+  >(null);
+  const bubbleCursorRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [settingsPage, setSettingsPage] = useState<"main" | "automations">(
     "main",
   );
@@ -614,6 +617,15 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
   const activityLabelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevSummaryRef = useRef<string | null>(null);
 
+  // Bubble command channel — lifted here so the toolbar activity label can
+  // mirror in-flight tasks when the bubble itself is dismissed.
+  const {
+    apiKey: bubbleApiKey,
+    tasks: bubbleTasks,
+    commandHistory: bubbleHistory,
+    send: sendBubbleCommand,
+  } = useCommandSend(endpoint, currentSessionId ?? undefined);
+
   // Progress tracking: total annotations created vs resolved this session
   const [agentProgress, setAgentProgress] = useState<{
     total: number;
@@ -664,7 +676,6 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
   const popupRef = useRef<AnnotationPopupCSSHandle>(null);
   const editPopupRef = useRef<AnnotationPopupCSSHandle>(null);
-  const chatPanelRef = useRef<ChatPanelHandle>(null);
   const scrollTimeoutRef = useRef<ReturnType<typeof originalSetTimeout> | null>(null);
 
   const pathname =
@@ -695,15 +706,58 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     }
   }, [showSettings]);
 
-  // Handle showChat changes with exit animation
+  // Track the cursor so we can capture the element under it when `/` is pressed.
   useEffect(() => {
-    if (showChat) {
-      setShowChatVisible(true);
-    } else {
-      const timer = originalSetTimeout(() => setShowChatVisible(false), 0);
-      return () => clearTimeout(timer);
-    }
-  }, [showChat]);
+    const onMove = (e: MouseEvent) => {
+      bubbleCursorRef.current = { x: e.clientX, y: e.clientY };
+    };
+    window.addEventListener("mousemove", onMove, { passive: true });
+    return () => window.removeEventListener("mousemove", onMove);
+  }, []);
+
+  // Global `/` (and `⌘/`) invoke the cursor bubble. Shift+/ (i.e. `?` on US
+  // layouts, or `/` with shiftKey on others) attaches the element under the
+  // cursor as context so the agent can target it specifically.
+  useEffect(() => {
+    if (!endpoint || !currentSessionId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isSlashKey =
+        e.key === "/" || e.key === "?" || e.code === "Slash";
+      if (!isSlashKey) return;
+      if (showBubble) return;
+      const hasMod = e.metaKey || e.ctrlKey;
+      const target = e.target as HTMLElement | null;
+      const isEditable =
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+      if (isEditable && !hasMod) return;
+      if (e.altKey) return;
+
+      e.preventDefault();
+
+      // Capture the element under the cursor when Shift is held. Skip html/body
+      // so generic page clicks don't yield noise.
+      let captured: { name: string; path: string } | null = null;
+      if (e.shiftKey) {
+        const { x, y } = bubbleCursorRef.current;
+        const el = document.elementFromPoint(x, y);
+        if (
+          el instanceof HTMLElement &&
+          el.tagName !== "HTML" &&
+          el.tagName !== "BODY" &&
+          !el.closest("[data-feedback-toolbar]")
+        ) {
+          captured = identifyElement(el);
+        }
+      }
+      setBubbleCapturedElement(captured);
+      setShowBubble(true);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [endpoint, currentSessionId, showBubble]);
 
   // Unified marker visibility - depends on toolbar active, showMarkers toggle, and not blank canvas
   // This single effect handles all marker show/hide animations
@@ -3815,6 +3869,29 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     return styles;
   };
 
+  // Activity label source resolution: while the bubble is visible, its task
+  // pills already show status so we suppress the toolbar label. When the
+  // bubble is closed but bubble tasks are still running, surface them through
+  // the existing activity label so the user keeps ambient awareness.
+  const latestBubbleTask =
+    bubbleTasks.find((t) => t.status === "running") ??
+    bubbleTasks[bubbleTasks.length - 1];
+  const activityDisplay = showBubble
+    ? null
+    : latestBubbleTask
+      ? {
+          summary: latestBubbleTask.summary,
+          event:
+            latestBubbleTask.status === "error"
+              ? ("error" as const)
+              : ("tool_use" as const),
+          url: undefined as string | undefined,
+          active: latestBubbleTask.status === "running",
+        }
+      : showActivityLabel && agentActivity?.summary
+        ? agentActivity
+        : null;
+
   return createPortal(
     <div ref={portalWrapperRef} style={{ display: "contents" }} data-agentation-theme={isDarkMode ? "dark" : "light"} data-agentation-accent={settings.annotationColorId} data-agentation-root="">
       {/* Toolbar */}
@@ -3835,7 +3912,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       >
         {/* Morphing container */}
         <div
-          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${isDraggingToolbar ? styles.dragging : ""} ${toolbarPulse === 'edit' ? styles.editPulse : ""} ${toolbarPulse === 'resolve' ? styles.resolvePulse : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) || endpoint ? styles.serverConnected : ""}`}
+          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${isDraggingToolbar ? styles.dragging : ""} ${toolbarPulse === 'edit' ? styles.editPulse : ""} ${toolbarPulse === 'resolve' ? styles.resolvePulse : ""}`}
           onClick={
             !isActive
               ? (e) => {
@@ -3867,15 +3944,15 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               </span>
             )}
             {/* Agent activity label - shown on collapsed FAB */}
-            {!isActive && showActivityLabel && agentActivity?.summary && (
+            {!isActive && activityDisplay && (
               <span
-                className={`${styles.agentActivityLabel} ${styles.onFab} ${!isDarkMode ? styles.light : ""} ${activityLabelExiting ? styles.exiting : ""} ${activityLabelSwapping ? styles.swapping : ""} ${agentActivity.event === "error" ? styles.error : ""} ${agentActivity.url ? styles.clickable : ""}`}
-                onClick={agentActivity.url ? () => { window.location.href = agentActivity!.url!; } : undefined}
-                style={agentActivity.url ? { cursor: "pointer" } : undefined}
+                className={`${styles.agentActivityLabel} ${styles.onFab} ${!isDarkMode ? styles.light : ""} ${activityLabelExiting ? styles.exiting : ""} ${activityLabelSwapping ? styles.swapping : ""} ${activityDisplay.event === "error" ? styles.error : ""} ${activityDisplay.url ? styles.clickable : ""}`}
+                onClick={activityDisplay.url ? () => { window.location.href = activityDisplay.url!; } : undefined}
+                style={activityDisplay.url ? { cursor: "pointer" } : undefined}
               >
                 <span className={styles.agentActivityLabelText}>
-                  {agentActivity.event === "tool_use" && <span className={styles.activityDot} />}
-                  {agentActivity.summary}
+                  {activityDisplay.event === "tool_use" && <span className={styles.activityDot} />}
+                  {activityDisplay.summary}
                   {agentProgress && agentProgress.total > 0 && (
                     <span key={progressBump} className={`${styles.progressCount} ${progressBump > 0 ? styles.progressBump : ""}`}>
                       {" "}{agentProgress.resolved}/{agentProgress.total}
@@ -4072,7 +4149,6 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                   e.stopPropagation();
                   hideTooltipsUntilMouseLeave();
                   if (isDesignMode) closeDesignMode();
-                  if (showChat) setShowChat(false);
                   setShowSettings(!showSettings);
                 }}
               >
@@ -4080,25 +4156,25 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               </button>
               {endpoint && connectionStatus !== "disconnected" && (
                 <span
-                  className={`${styles.mcpIndicator} ${!isDarkMode ? styles.light : ""} ${styles[connectionStatus]} ${agentActivity?.active ? (agentActivity.event === "error" ? styles.agentError : styles.agentActive) : ""} ${showSettings ? styles.hidden : ""}`}
+                  className={`${styles.mcpIndicator} ${!isDarkMode ? styles.light : ""} ${styles[connectionStatus]} ${activityDisplay?.active ? (activityDisplay.event === "error" ? styles.agentError : styles.agentActive) : ""} ${showSettings ? styles.hidden : ""}`}
                   title={
-                    agentActivity?.active
-                      ? agentActivity.summary
+                    activityDisplay?.active
+                      ? activityDisplay.summary
                       : connectionStatus === "connected"
                         ? "MCP Connected"
                         : "MCP Connecting..."
                   }
                 />
               )}
-              {isActive && showActivityLabel && agentActivity?.summary && (
+              {isActive && activityDisplay && (
                 <span
-                  className={`${styles.agentActivityLabel} ${isDesignMode ? styles.belowToolbar : styles.onToolbar} ${!isDarkMode ? styles.light : ""} ${activityLabelExiting ? styles.exiting : ""} ${activityLabelSwapping ? styles.swapping : ""} ${agentActivity.event === "error" ? styles.error : ""} ${agentActivity.url ? styles.clickable : ""}`}
-                  onClick={agentActivity.url ? () => { window.location.href = agentActivity!.url!; } : undefined}
-                  style={agentActivity.url ? { cursor: "pointer" } : undefined}
+                  className={`${styles.agentActivityLabel} ${isDesignMode ? styles.belowToolbar : styles.onToolbar} ${!isDarkMode ? styles.light : ""} ${activityLabelExiting ? styles.exiting : ""} ${activityLabelSwapping ? styles.swapping : ""} ${activityDisplay.event === "error" ? styles.error : ""} ${activityDisplay.url ? styles.clickable : ""}`}
+                  onClick={activityDisplay.url ? () => { window.location.href = activityDisplay.url!; } : undefined}
+                  style={activityDisplay.url ? { cursor: "pointer" } : undefined}
                 >
                   <span className={styles.agentActivityLabelText}>
-                    {agentActivity.event === "tool_use" && <span className={styles.activityDot} />}
-                    {agentActivity.summary}
+                    {activityDisplay.event === "tool_use" && <span className={styles.activityDot} />}
+                    {activityDisplay.summary}
                     {agentProgress && agentProgress.total > 0 && (
                       <span className={styles.progressCount}>
                         {" "}{agentProgress.resolved}/{agentProgress.total}
@@ -4109,24 +4185,6 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               )}
               <span className={styles.buttonTooltip}>Settings</span>
             </div>
-
-            {endpoint && (
-              <div className={styles.buttonWrapper}>
-                <button
-                  className={styles.controlButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    hideTooltipsUntilMouseLeave();
-                    if (isDesignMode) closeDesignMode();
-                    if (showSettings) setShowSettings(false);
-                    setShowChat(!showChat);
-                  }}
-                >
-                  <IconChatEllipsis size={22} />
-                </button>
-                <span className={styles.buttonTooltip}>AI Chat</span>
-              </div>
-            )}
 
             <div
               className={styles.divider}
@@ -4307,18 +4365,30 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             onHideToolbar={hideToolbarTemporarily}
           />
 
-          {showChatVisible && endpoint && currentSessionId && (
-            <ChatPanel
-              ref={chatPanelRef}
-              endpoint={endpoint}
-              sessionId={currentSessionId}
-              isVisible={showChat}
-              toolbarNearBottom={!!toolbarPosition && toolbarPosition.y < 230}
-              isDarkMode={isDarkMode}
-            />
-          )}
         </div>
       </div>
+
+      {endpoint && currentSessionId && (
+        <BubbleVariant
+          isVisible={showBubble}
+          isDarkMode={isDarkMode}
+          capturedElement={bubbleCapturedElement}
+          onClose={() => {
+            setShowBubble(false);
+            setBubbleCapturedElement(null);
+          }}
+          onOpenSettings={() => {
+            setShowBubble(false);
+            setBubbleCapturedElement(null);
+            setSettingsPage("automations");
+            setShowSettings(true);
+          }}
+          apiKey={bubbleApiKey}
+          tasks={bubbleTasks}
+          commandHistory={bubbleHistory}
+          send={sendBubbleCommand}
+        />
+      )}
 
       {/* Blank canvas backdrop — stays mounted so opacity transition works on open/close */}
       {(isDesignMode || designOverlayExiting) && (

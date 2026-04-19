@@ -3,6 +3,7 @@ import { OUTPUT_DETAIL_OPTIONS } from "../../../utils/generate-output";
 import { HelpTooltip } from "../../help-tooltip";
 import { IconChevronLeft, IconMoon, IconSun } from "../../icons";
 import { Switch } from "../../switch";
+import { ApiKeySection } from "./api-key-section";
 import { CheckboxField } from "./checkbox-field";
 import styles from "./styles.module.scss";
 
@@ -302,6 +303,13 @@ export function SettingsPanel({
               </a>
             </p>
           </div>
+
+          {endpoint && (
+            <>
+              <div className={styles.divider}></div>
+              <ApiKeySection endpoint={endpoint} />
+            </>
+          )}
 
           <div className={styles.divider}></div>
 

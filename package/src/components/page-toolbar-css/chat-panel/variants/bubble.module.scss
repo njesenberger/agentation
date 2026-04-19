@@ -1,0 +1,218 @@
+// =============================================================================
+// Bubble — cursor-anchored command bubble with real <input> + fake OS cursor
+// overlay that appears while typing hides the real one.
+// =============================================================================
+
+@keyframes bubbleIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.8);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes bubbleDotPulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.3); }
+}
+
+.bubble {
+  position: fixed;
+  z-index: 2147483000;
+  display: block;
+  color: #1a1a1a;
+  transform-origin: top left;
+
+  &.enter { animation: bubbleIn 0.16s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  &.exit {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.92);
+    filter: blur(4px);
+    pointer-events: none;
+    transition: opacity 0.1s ease, transform 0.1s ease, filter 0.1s ease;
+  }
+
+  &.light {
+    color: #1a1a1a; // keep bubble dark even on light pages for contrast
+  }
+}
+
+.body {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 18px 11px 14px;
+  background: currentColor;
+  border-radius: 0 22px 22px 10px;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.22));
+
+  .light & {
+    filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.16));
+  }
+}
+
+// =============================================================================
+// Task list — the open-channel queue of in-flight commands
+// =============================================================================
+
+@keyframes taskPillIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.95);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.taskList {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.taskPill {
+  // Match the bubble's asymmetric pill — task pills read as children of
+  // the bubble, same sharp top-left pointing toward the operator.
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 10px;
+  background: #1a1a1a;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  line-height: 1;
+  border-radius: 0 22px 22px 10px;
+  white-space: nowrap;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.18));
+  animation: taskPillIn 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: opacity 0.4s ease, transform 0.4s ease, background 0.15s ease;
+  max-width: 260px;
+}
+
+.taskPillDismissable {
+  // Opt back into pointer events so a running task can be clicked to dismiss
+  // the bubble (mirrors Esc — the task itself keeps running).
+  pointer-events: auto;
+  cursor: pointer;
+
+  &:hover {
+    background: #242424;
+  }
+
+  &:hover .taskCancel {
+    opacity: 1;
+  }
+}
+
+.taskCancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  margin-left: 2px;
+  font-size: 14px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.55);
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+
+  .taskPillDismissable:hover & {
+    color: rgba(255, 255, 255, 0.85);
+  }
+}
+
+.taskFading {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.taskDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+
+  &.dotRunning {
+    background: rgba(74, 158, 255, 0.95);
+    animation: bubbleDotPulse 1.2s ease-in-out infinite;
+  }
+  &.dotDone  { background: rgba(52, 199, 89, 0.95); }
+  &.dotError { background: rgba(255, 69, 58, 0.95); }
+}
+
+.taskText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.input {
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 14px;
+  line-height: 1;
+  font-family: inherit;
+  caret-color: rgba(74, 158, 255, 0.95);
+  padding: 0;
+  transition: width 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  &:disabled {
+    opacity: 0.75;
+    cursor: default;
+  }
+}
+
+// Target chip — shows which element the command will be scoped to
+// (populated when the bubble was opened with Shift+/).
+.targetChip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 140px;
+  padding: 3px 8px;
+  background: rgba(74, 158, 255, 0.18);
+  color: rgba(74, 158, 255, 1);
+  font-size: 11px;
+  line-height: 1;
+  border-radius: 999px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+  cursor: help;
+}
+
+// Fake OS cursor — shown at the last-known real cursor position while typing
+// hides the native one. Hidden again as soon as the mouse moves.
+.fakeCursor {
+  position: fixed;
+  z-index: 2147483001; // above the bubble
+  pointer-events: none;
+  display: block;
+  // macOS composites a subtle shadow beneath the cursor; mimic it so the fake
+  // cursor sits on the page with the same weight.
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.35));
+}

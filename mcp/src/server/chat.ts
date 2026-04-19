@@ -355,6 +355,138 @@ function parseSourceHints(message: string): Map<string, string> {
   return hints;
 }
 
+// ---------------------------------------------------------------------------
+// Command mode — bubble commands bypass the annotation-fix workflow
+// ---------------------------------------------------------------------------
+
+export type CommandContext = {
+  url?: string;
+  title?: string;
+  viewport?: { width: number; height: number };
+  theme?: "dark" | "light";
+  element?: { name: string; path: string };
+};
+
+export type ChatMessageOptions = {
+  context?: CommandContext;
+  kind?: "command" | "annotation";
+};
+
+function buildCommandSystemPrompt(
+  _sessionId: string,
+  context?: CommandContext,
+): string {
+  const lines: string[] = [
+    "You are an AI coding agent in Agentation, a visual feedback toolbar.",
+    `Project root: ${projectRoot}`,
+    "",
+    "## Command mode",
+    "The user issued a direct code-change command from a cursor-anchored input bubble. There is no annotation to resolve — just make the edit and confirm completion in one short sentence.",
+    "",
+  ];
+
+  let resolvedFile: string | null = null;
+  let preReadSnippet: string | null = null;
+
+  if (context) {
+    lines.push("## Page context");
+    if (context.url) {
+      lines.push(`- URL: ${context.url}`);
+      resolvedFile = resolvePageUrl(context.url);
+      if (resolvedFile) {
+        lines.push(`- Source file: ${resolvedFile}`);
+        // Pre-read the file so the agent can skip the initial read_file call.
+        // Cap at ~6000 chars — plenty for most page files, avoids blowing out
+        // the system prompt on very long ones.
+        try {
+          const content = readFileSync(
+            resolve(projectRoot, resolvedFile),
+            "utf-8",
+          );
+          const MAX = 6000;
+          preReadSnippet =
+            content.length > MAX
+              ? content.slice(0, MAX) + "\n// …file truncated…"
+              : content;
+        } catch {
+          // If reading fails, fall through to agent-driven read_file.
+        }
+      }
+    }
+    if (context.title) lines.push(`- Title: ${context.title}`);
+    if (context.viewport) {
+      lines.push(
+        `- Viewport: ${context.viewport.width}×${context.viewport.height}`,
+      );
+    }
+    if (context.theme) lines.push(`- Theme: ${context.theme}`);
+    if (context.element) {
+      lines.push(`- Target element: ${context.element.name}`);
+      lines.push(`  DOM path: ${context.element.path}`);
+      lines.push(
+        "  Scope edits to this element unless the user explicitly asks for a global change.",
+      );
+    }
+    lines.push("");
+  }
+
+  if (resolvedFile && preReadSnippet) {
+    lines.push(`## Source file: ${resolvedFile}`);
+    lines.push("```tsx");
+    lines.push(preReadSnippet);
+    lines.push("```");
+    lines.push("");
+  }
+
+  lines.push("## Workflow");
+  if (resolvedFile && preReadSnippet) {
+    lines.push(
+      `1. The source file has been pre-read above — do NOT call read_file.`,
+    );
+    lines.push(
+      `2. edit_file on ${resolvedFile} with old_string/new_string that produce a visible, meaningful result.`,
+    );
+    lines.push(
+      "3. Reply with one short sentence confirming what changed.",
+    );
+  } else if (resolvedFile) {
+    lines.push(
+      `1. read_file ${resolvedFile} (the URL has already been resolved for you).`,
+    );
+    lines.push(
+      `2. edit_file on the same path with old_string/new_string.`,
+    );
+    lines.push(
+      "3. Reply with one short sentence confirming what changed.",
+    );
+  } else {
+    lines.push(
+      "1. Use the URL above to locate the source file. In monorepos the app tree is often under `package/example/src/app/…` rather than at the root.",
+    );
+    lines.push("2. read_file the likely source to see current code.");
+    lines.push(
+      "3. edit_file to apply the change — old_string/new_string must produce a visible, meaningful result.",
+    );
+    lines.push("4. Reply with one short sentence confirming what changed.");
+  }
+  lines.push("");
+  lines.push("## Rules");
+  lines.push(
+    "- Interpret the command as design intent, not literal text. Choose the minimal edit that realises the intent.",
+  );
+  lines.push(
+    "- For global style changes (colour tokens, typography, spacing), prefer editing theme/token files over individual components.",
+  );
+  lines.push(
+    "- Never call resolve_annotation — this mode has no annotations.",
+  );
+  lines.push(
+    "- If the command cannot be completed, say so in one sentence. Do not mention annotations.",
+  );
+
+  return lines.join("\n");
+}
+
 export function buildSystemPrompt(sessionId: string, sourceHints?: Map<string, string>, isLayoutChange = false): string {
   const session = getSessionWithAnnotations(sessionId);
   const allPending = getPendingAnnotations(sessionId);
@@ -487,25 +619,51 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
     case "grep_code": {
       const pattern = input.pattern as string;
       try {
+        // Directories to skip on every search — dependencies and build output.
+        const excludedDirs = [
+          "node_modules", ".git", "dist", ".next",
+          "out", "build", "coverage", ".turbo", ".vercel",
+        ];
         const args = hasRg
-          ? ["--no-heading", "-n", "--max-count", "20", "-F",
-             "--glob", "!node_modules", "--glob", "!.git", "--glob", "!dist", "--glob", "!.next",
-             "--", pattern, projectRoot]
-          : ["-rn", "--max-count=20", "-F",
-             "--include=*.tsx", "--include=*.jsx", "--include=*.ts", "--include=*.js",
-             "--include=*.css", "--include=*.scss",
-             "--exclude-dir=node_modules", "--exclude-dir=.git", "--exclude-dir=dist", "--exclude-dir=.next",
-             "--", pattern, projectRoot];
+          ? [
+              "--no-heading", "-n",
+              "--max-count", "20",
+              "--max-columns", "240",
+              "-F",
+              ...excludedDirs.flatMap(d => ["--glob", `!${d}`]),
+              "--glob", "!*.map",
+              "--glob", "!*-lock.*",
+              "--glob", "!pnpm-lock.yaml",
+              "--", pattern, projectRoot,
+            ]
+          : [
+              "-rn", "--max-count=20", "-F",
+              "--include=*.tsx", "--include=*.jsx", "--include=*.ts", "--include=*.js",
+              "--include=*.css", "--include=*.scss", "--include=*.sass",
+              "--include=*.html", "--include=*.md", "--include=*.mdx",
+              ...excludedDirs.map(d => `--exclude-dir=${d}`),
+              "--", pattern, projectRoot,
+            ];
         const cmd = hasRg ? "rg" : "grep";
         const result = execFileSync(cmd, args, {
-          encoding: "utf-8", maxBuffer: 1024 * 50, timeout: 5000,
+          encoding: "utf-8",
+          // 5MB is enough for even broad patterns without blowing out memory.
+          // We slice to 15 lines after, so only the first chunk matters.
+          maxBuffer: 1024 * 1024 * 5,
+          timeout: 5000,
         }).trim();
         return result.split("\n")
           .map(l => l.startsWith(projectRoot) ? l.slice(projectRoot.length + 1) : l)
           .slice(0, 15).join("\n");
       } catch (err: unknown) {
         if ((err as { status?: number }).status === 1) return "No matches found.";
-        return `Search error: ${err instanceof Error ? err.message : "unknown"}`;
+        const msg = err instanceof Error ? err.message : "unknown";
+        // ENOBUFS means grep returned more than our buffer — try a narrower
+        // pattern or a more specific string.
+        if (/ENOBUFS/.test(msg)) {
+          return "Search matched too much — try a more specific pattern (add context, unique substring, or a longer phrase).";
+        }
+        return `Search error: ${msg}`;
       }
     }
 
@@ -742,9 +900,15 @@ async function getOpenAIClient() {
 // Anthropic Provider
 // ---------------------------------------------------------------------------
 
-async function streamAnthropic(sessionId: string, message: string, res: ServerResponse): Promise<void> {
+async function streamAnthropic(
+  sessionId: string,
+  message: string,
+  res: ServerResponse,
+  options: ChatMessageOptions = {},
+): Promise<void> {
   const t0 = Date.now();
-  log(`━━━ Chat request received ━━━`);
+  const isCommand = options.kind === "command";
+  log(`━━━ Chat request received${isCommand ? " (command)" : ""} ━━━`);
   log(`  message: "${message.slice(0, 80)}"`);
 
   const client = await getAnthropicClient();
@@ -756,10 +920,18 @@ async function streamAnthropic(sessionId: string, message: string, res: ServerRe
   // Parse source hints from enriched message to skip grep
   const sourceHints = parseSourceHints(message);
   // Classify action type
-  const isLayoutChange = message.includes("layout changes") || message.includes("design changes");
+  const isLayoutChange =
+    !isCommand &&
+    (message.includes("layout changes") || message.includes("design changes"));
 
-  let systemPrompt = buildSystemPrompt(sessionId, sourceHints, isLayoutChange);
-  const isDesignPlacement = message.includes("design changes") || message.includes("Design Layout") || message.includes("## Wireframe:");
+  let systemPrompt = isCommand
+    ? buildCommandSystemPrompt(sessionId, options.context)
+    : buildSystemPrompt(sessionId, sourceHints, isLayoutChange);
+  const isDesignPlacement =
+    !isCommand &&
+    (message.includes("design changes") ||
+      message.includes("Design Layout") ||
+      message.includes("## Wireframe:"));
 
   // For layout/design changes, pre-resolve the page file and include its content
   if (isLayoutChange) {
@@ -936,17 +1108,24 @@ async function streamAnthropic(sessionId: string, message: string, res: ServerRe
   const isWireframe = isDesignPlacement && message.includes("## Wireframe:");
 
   for (let step = 0; step < maxSteps; step++) {
-    // Step 0 with pre-read: force tool_choice to skip preamble
-    const useToolChoice = step === 0 && hasPreRead;
+    // Step 0 with pre-read: force tool_choice to skip preamble. Command mode
+    // opts out — the pre-read is a hint, not a mandate, so the model can
+    // grep/list for related components before editing.
+    const useToolChoice = step === 0 && hasPreRead && !isCommand;
 
     log(`  Step ${step + 1}: calling API (claude-sonnet-4-6)...`);
 
-    // Gate resolve behind hasEdited; limit tools based on action type
+    // Gate resolve behind hasEdited; limit tools based on action type.
+    // In command mode there are no annotations to resolve.
     const tools = isWireframe
       ? [WRITE_FILE_TOOL, ...ANTHROPIC_TOOLS.filter(t => t.name === "resolve_annotation" && hasEdited)]
       : ANTHROPIC_TOOLS.filter(t => {
-          if (t.name === "resolve_annotation") return hasEdited;
-          if (hasPreRead && step === 0 && !isLayoutChange) return t.name === "edit_file";
+          if (t.name === "resolve_annotation") return !isCommand && hasEdited;
+          // Only the annotation/layout pre-read flow restricts step-0 to
+          // edit_file. Command mode lets the model explore if it needs to.
+          if (hasPreRead && step === 0 && !isLayoutChange && !isCommand) {
+            return t.name === "edit_file";
+          }
           return true;
         });
 
@@ -1052,8 +1231,16 @@ async function streamAnthropic(sessionId: string, message: string, res: ServerRe
     }
   }
 
-  // Mandatory resolve on exhaustion — notify the UI instead of silently dropping
-  if (!fullAssistantText.includes("Resolved") && !hasEdited) {
+  // Fallback on exhaustion. In command mode we don't pretend there's an
+  // annotation pending — just say the edit didn't land.
+  if (!hasEdited && !fullAssistantText.trim()) {
+    writeSSE(res, {
+      type: "text_delta",
+      text: isCommand
+        ? "Couldn't complete that command — try rephrasing or adding detail."
+        : "\n\nCould not complete this edit — the annotation remains pending for manual review.",
+    });
+  } else if (!isCommand && !fullAssistantText.includes("Resolved") && !hasEdited) {
     writeSSE(res, { type: "text_delta", text: "\n\nCould not complete this edit — the annotation remains pending for manual review." });
   }
 
@@ -1082,14 +1269,23 @@ async function streamAnthropic(sessionId: string, message: string, res: ServerRe
 // OpenAI Provider
 // ---------------------------------------------------------------------------
 
-async function streamOpenAI(sessionId: string, message: string, res: ServerResponse): Promise<void> {
+async function streamOpenAI(
+  sessionId: string,
+  message: string,
+  res: ServerResponse,
+  options: ChatMessageOptions = {},
+): Promise<void> {
+  const isCommand = options.kind === "command";
   const client = await getOpenAIClient();
   const history = getHistory(sessionId);
   history.push({ role: "user", content: message });
 
   const sourceHints = parseSourceHints(message);
+  const systemPrompt = isCommand
+    ? buildCommandSystemPrompt(sessionId, options.context)
+    : buildSystemPrompt(sessionId, sourceHints);
   const messages: Array<Record<string, unknown>> = [
-    { role: "system", content: buildSystemPrompt(sessionId, sourceHints) },
+    { role: "system", content: systemPrompt },
     ...history.map(m => ({ role: m.role, content: m.content })),
   ];
 
@@ -1101,10 +1297,12 @@ async function streamOpenAI(sessionId: string, message: string, res: ServerRespo
   for (let step = 0; step < 6; step++) {
     if (hadToolUse) { writeSSE(res, { type: "message_break" }); hadToolUse = false; }
 
-    // Gate resolve behind hasEdited
-    const tools = hasEdited
-      ? OPENAI_TOOLS
-      : OPENAI_TOOLS.filter(t => t.function.name !== "resolve_annotation");
+    // Gate resolve behind hasEdited. Command mode has no annotations to resolve.
+    const tools = isCommand
+      ? OPENAI_TOOLS.filter(t => t.function.name !== "resolve_annotation")
+      : hasEdited
+        ? OPENAI_TOOLS
+        : OPENAI_TOOLS.filter(t => t.function.name !== "resolve_annotation");
 
     const stream = await client.chat.completions.create({
       model: "gpt-4o", messages: messages as any, tools, stream: true,
@@ -1173,8 +1371,16 @@ async function streamOpenAI(sessionId: string, message: string, res: ServerRespo
     }
   }
 
-  // Mandatory resolve on exhaustion
-  if (!fullAssistantText.includes("Resolved") && !hasEdited) {
+  // Fallback on exhaustion — match the command-vs-annotation split used in the
+  // Anthropic path.
+  if (!hasEdited && !fullAssistantText.trim()) {
+    writeSSE(res, {
+      type: "text_delta",
+      text: isCommand
+        ? "Couldn't complete that command — try rephrasing or adding detail."
+        : "\n\nCould not complete this edit — the annotation remains pending for manual review.",
+    });
+  } else if (!isCommand && !fullAssistantText.includes("Resolved") && !hasEdited) {
     writeSSE(res, { type: "text_delta", text: "\n\nCould not complete this edit — the annotation remains pending for manual review." });
   }
 
@@ -1192,7 +1398,12 @@ async function streamOpenAI(sessionId: string, message: string, res: ServerRespo
 // Public API
 // ---------------------------------------------------------------------------
 
-export async function handleChatMessage(sessionId: string, message: string, res: ServerResponse): Promise<void> {
+export async function handleChatMessage(
+  sessionId: string,
+  message: string,
+  res: ServerResponse,
+  options: ChatMessageOptions = {},
+): Promise<void> {
   if (!apiKey || !provider) {
     startSSE(res);
     writeSSE(res, { type: "error", message: "No API key configured. Send your key to POST /chat/api-key first." });
@@ -1209,8 +1420,8 @@ export async function handleChatMessage(sessionId: string, message: string, res:
 
   try {
     await clientPromise; // Ensure SDK is ready
-    if (provider === "anthropic") await streamAnthropic(sessionId, message, res);
-    else await streamOpenAI(sessionId, message, res);
+    if (provider === "anthropic") await streamAnthropic(sessionId, message, res, options);
+    else await streamOpenAI(sessionId, message, res, options);
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : "Unknown error";
     log(`Chat error: ${errMsg}`);

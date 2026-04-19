@@ -681,6 +681,86 @@
   }
 }
 
+.apiKeyBadge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: rgba(74, 158, 255, 1);
+  background: rgba(74, 158, 255, 0.14);
+  line-height: 1.4;
+
+  [data-agentation-theme="light"] & {
+    color: rgba(74, 158, 255, 1);
+    background: rgba(74, 158, 255, 0.1);
+  }
+}
+
+.apiKeyActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.apiKeySaveButton {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  background: rgba(74, 158, 255, 0.9);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(74, 158, 255, 1);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+}
+
+.apiKeyCancelButton {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.65);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  [data-agentation-theme="light"] & {
+    color: rgba(0, 0, 0, 0.55);
+    border-color: rgba(0, 0, 0, 0.14);
+
+    &:hover:not(:disabled) {
+      background: rgba(0, 0, 0, 0.04);
+      color: rgba(0, 0, 0, 0.85);
+    }
+  }
+}
+
+.apiKeyError {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: rgba(255, 69, 58, 0.95);
+}
+
 .webhookUrlInput {
   display: block;
   width: 100%;

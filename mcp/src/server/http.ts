@@ -1033,10 +1033,56 @@ const getChatApiKeyHandler: RouteHandler = async (_req, res) => {
 };
 
 const chatMessageHandler: RouteHandler = async (req, res) => {
-  const body = await parseBody<{ sessionId?: string; message?: string }>(req);
+  const body = await parseBody<{
+    sessionId?: string;
+    message?: string;
+    context?: {
+      url?: string;
+      title?: string;
+      viewport?: { width?: number; height?: number };
+      theme?: "dark" | "light";
+      element?: { name?: string; path?: string };
+    };
+    kind?: "command" | "annotation";
+  }>(req);
   if (!body.message) return sendError(res, 400, "message is required");
   if (!body.sessionId) return sendError(res, 400, "sessionId is required");
-  await handleChatMessage(body.sessionId, body.message, res);
+
+  // Normalise context — only forward fields that look sane.
+  const context = body.context
+    ? {
+        url: typeof body.context.url === "string" ? body.context.url : undefined,
+        title:
+          typeof body.context.title === "string" ? body.context.title : undefined,
+        viewport:
+          body.context.viewport &&
+          typeof body.context.viewport.width === "number" &&
+          typeof body.context.viewport.height === "number"
+            ? {
+                width: body.context.viewport.width,
+                height: body.context.viewport.height,
+              }
+            : undefined,
+        theme:
+          body.context.theme === "dark" || body.context.theme === "light"
+            ? body.context.theme
+            : undefined,
+        element:
+          body.context.element &&
+          typeof body.context.element.name === "string" &&
+          typeof body.context.element.path === "string"
+            ? {
+                name: body.context.element.name,
+                path: body.context.element.path,
+              }
+            : undefined,
+      }
+    : undefined;
+
+  await handleChatMessage(body.sessionId, body.message, res, {
+    context,
+    kind: body.kind,
+  });
 };
 
 const clearChatHistoryHandler: RouteHandler = async (_req, res, params) => {
