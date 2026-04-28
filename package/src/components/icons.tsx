@@ -250,6 +250,17 @@ export const IconCopyAnimated = ({
 );
 
 // Animated send arrow icon (paper plane style with checkmark/error transition)
+export const IconSparkle = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="12.25 12.25 7.5 7.5" fill="none">
+    <path
+      d="M16 12.75L16.5179 13.9677C16.8078 14.6494 17.3506 15.1922 18.0323 15.4821L19.25 16L18.0323 16.5179C17.3506 16.8078 16.8078 17.3506 16.5179 18.0323L16 19.25L15.4821 18.0323C15.1922 17.3506 14.6494 16.8078 13.9677 16.5179L12.75 16L13.9677 15.4821C14.6494 15.1922 15.1922 14.6494 15.4821 13.9677L16 12.75Z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 export const IconSendArrow = ({
   size = 24,
   state = "idle",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -23,7 +23,7 @@ import {
   IconHelp,
 } from "../icons";
 import { BubbleVariant } from "./chat-panel/variants/bubble";
-import { useCommandSend } from "./chat-panel/use-command-send";
+import { useCommandSend, type SendContext } from "./chat-panel/use-command-send";
 import { Tooltip } from "../tooltip";
 import { HelpTooltip } from "../help-tooltip";
 import { DesignMode } from "../design-mode";
@@ -141,12 +141,19 @@ type HoverInfo = {
   elementPath: string;
   rect: DOMRect | null;
   reactComponents?: string | null;
+  // Live reference to the hovered DOM node so we can pull computed styles
+  // for the v2 hover label's expanded metadata view.
+  targetElement?: HTMLElement | null;
 };
 
 export type OutputDetailLevel = "compact" | "standard" | "detailed" | "forensic";
 // ReactComponentMode is now derived from outputDetail when reactEnabled is true
 export type ReactComponentMode = "smart" | "filtered" | "all" | "off";
 type MarkerClickBehavior = "edit" | "delete";
+
+// How long a "done" check stays on a marker before the annotation auto-removes.
+// Long enough for the user to verify the change, short enough not to clutter.
+const AGENT_DONE_HOLD_MS = 12_000;
 
 export type ToolbarSettings = {
   outputDetail: OutputDetailLevel;
@@ -157,6 +164,9 @@ export type ToolbarSettings = {
   markerClickBehavior: MarkerClickBehavior;
   webhookUrl: string;
   webhooksEnabled: boolean;
+  // v2: when true, submitting an annotation also fires the agent. When false,
+  // submitting only persists the annotation locally / sends to webhooks.
+  agentMode: boolean;
 };
 
 const DEFAULT_SETTINGS: ToolbarSettings = {
@@ -168,6 +178,7 @@ const DEFAULT_SETTINGS: ToolbarSettings = {
   markerClickBehavior: "edit",
   webhookUrl: "",
   webhooksEnabled: true,
+  agentMode: true,
 };
 
 // Simple URL validation - checks for valid http(s) URL format
@@ -377,6 +388,9 @@ export function PageFeedbackToolbarCSS({
   const [markersExiting, setMarkersExiting] = useState(false);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
   const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
+  // Tracks whether Alt/Option is currently held — drives the hover label's
+  // expanded metadata view.
+  const [altHeld, setAltHeld] = useState(false);
   const [pendingAnnotation, setPendingAnnotation] = useState<{
     x: number;
     y: number;
@@ -411,6 +425,14 @@ export function PageFeedbackToolbarCSS({
   const [sendState, setSendState] = useState<
     "idle" | "sending" | "sent" | "failed"
   >("idle");
+  // v2: per-annotation agent state for the bulk "Action annotations" flow.
+  // Map of annotation id → "running" | "done". Pending (no entry) renders the
+  // default numbered marker.
+  const [agentMarkerStates, setAgentMarkerStates] = useState<
+    Map<string, "running" | "done">
+  >(new Map());
+  const taskToAnnotationRef = useRef<Map<string, string>>(new Map());
+  const handledAgentTasksRef = useRef<Set<string>>(new Set());
   const [cleared, setCleared] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [hoveredMarkerId, setHoveredMarkerId] = useState<string | null>(null);
@@ -705,6 +727,22 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       return () => clearTimeout(timer);
     }
   }, [showSettings]);
+
+  // Track Alt/Option modifier so the hover label can expand into its
+  // metadata-rich variant while held.
+  useEffect(() => {
+    if (!isActive) return;
+    const onKey = (e: KeyboardEvent) => setAltHeld(e.altKey);
+    const onBlur = () => setAltHeld(false);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKey);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKey);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [isActive]);
 
   // Track the cursor so we can capture the element under it when `/` is pressed.
   useEffect(() => {
@@ -2098,6 +2136,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         elementPath: path,
         rect,
         reactComponents,
+        targetElement: elementUnder as HTMLElement,
       });
       setHoverPosition({ x: e.clientX, y: e.clientY });
     };
@@ -2112,6 +2151,9 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     setHoveredMarkerId(null);
     setHoveredTargetElement(null);
     setHoveredTargetElements([]);
+    // Dismiss the v2 cursor bubble if it's open — the edit popup takes over.
+    setShowBubble(false);
+    setBubbleCapturedElement(null);
 
     // Try to find elements at the annotation's position(s) for live tracking
     if (annotation.elementBoundingBoxes?.length) {
@@ -2293,6 +2335,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         targetElement: elementUnder, // Store for live position queries
       });
       setHoverInfo(null);
+      // v2: route new annotations through the cursor bubble. The element
+      // outline still draws via pendingAnnotation; the bubble owns input.
+      setBubbleCapturedElement({ name, path });
+      setShowBubble(true);
     };
 
     // Use capture phase to intercept before element handlers
@@ -2821,7 +2867,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
   // Add annotation
   const addAnnotation = useCallback(
-    (comment: string): Promise<void> | undefined => {
+    (comment: string): string | undefined => {
       if (!pendingAnnotation) return;
 
       const newAnnotation: Annotation = {
@@ -2882,33 +2928,46 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
       window.getSelection()?.removeAllRanges();
 
-      // Sync to server (non-blocking, but update local ID with server's ID)
-      // Returns the promise so callers (e.g. onSubmitToAgent) can await sync completion
+      // Sync to server (non-blocking). When the server assigns a different
+      // ID, re-key any existing agent-marker / task linkages so the marker's
+      // running/done indicator survives the rename.
       if (endpoint && currentSessionId) {
-        return syncAnnotation(endpoint, currentSessionId, newAnnotation)
+        syncAnnotation(endpoint, currentSessionId, newAnnotation)
           .then((serverAnnotation) => {
-            // Update local annotation with server-assigned ID
-            if (serverAnnotation.id !== newAnnotation.id) {
-              setAnnotations((prev) =>
-                prev.map((a) =>
-                  a.id === newAnnotation.id
-                    ? { ...a, id: serverAnnotation.id }
-                    : a,
-                ),
-              );
-              // Also update the animated markers set
-              setAnimatedMarkers((prev) => {
-                const next = new Set(prev);
-                next.delete(newAnnotation.id);
-                next.add(serverAnnotation.id);
-                return next;
-              });
-            }
+            if (serverAnnotation.id === newAnnotation.id) return;
+            setAnnotations((prev) =>
+              prev.map((a) =>
+                a.id === newAnnotation.id
+                  ? { ...a, id: serverAnnotation.id }
+                  : a,
+              ),
+            );
+            setAnimatedMarkers((prev) => {
+              const next = new Set(prev);
+              next.delete(newAnnotation.id);
+              next.add(serverAnnotation.id);
+              return next;
+            });
+            setAgentMarkerStates((prev) => {
+              const status = prev.get(newAnnotation.id);
+              if (!status) return prev;
+              const next = new Map(prev);
+              next.delete(newAnnotation.id);
+              next.set(serverAnnotation.id, status);
+              return next;
+            });
+            taskToAnnotationRef.current.forEach((aId, tId) => {
+              if (aId === newAnnotation.id) {
+                taskToAnnotationRef.current.set(tId, serverAnnotation.id);
+              }
+            });
           })
           .catch((error) => {
             console.warn("[Agentation] Failed to sync annotation:", error);
           });
       }
+
+      return newAnnotation.id;
     },
     [
       pendingAnnotation,
@@ -3374,6 +3433,47 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     onCopy,
   ]);
 
+  // v2: bulk-fire all pending annotations through the agent. Each annotation
+  // Watch bubble tasks for completion and translate them back into marker
+  // state changes. Done tasks schedule the annotation for removal after 2s
+  // (the user's "in-view auto-dismiss" — simplified to a flat timer for v1).
+  useEffect(() => {
+    for (const task of bubbleTasks) {
+      if (handledAgentTasksRef.current.has(task.id)) continue;
+      if (task.status !== "done" && task.status !== "error") continue;
+      const annId = taskToAnnotationRef.current.get(task.id);
+      if (!annId) continue;
+      handledAgentTasksRef.current.add(task.id);
+      taskToAnnotationRef.current.delete(task.id);
+
+      if (task.status === "done") {
+        setAgentMarkerStates((prev) => {
+          const next = new Map(prev);
+          next.set(annId, "done");
+          return next;
+        });
+        // Hold the check on the marker long enough for the user to see and
+        // verify the agent's work before it disappears. 12s splits the
+        // difference between "snappy" and "they walked away and missed it".
+        window.setTimeout(() => {
+          setAnnotations((prev) => prev.filter((a) => a.id !== annId));
+          setAgentMarkerStates((prev) => {
+            const next = new Map(prev);
+            next.delete(annId);
+            return next;
+          });
+        }, AGENT_DONE_HOLD_MS);
+      } else {
+        // Error: revert the marker to its default numbered state.
+        setAgentMarkerStates((prev) => {
+          const next = new Map(prev);
+          next.delete(annId);
+          return next;
+        });
+      }
+    }
+  }, [bubbleTasks]);
+
   // Send to webhook
   const sendToWebhook = useCallback(async () => {
     const displayUrl =
@@ -3809,6 +3909,26 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     wireframePurpose,
   ]);
 
+  // Compute the hover label's expanded metadata only when Alt is held and a
+  // hovered element is available. Skipped otherwise — getComputedStyle isn't
+  // free and we'd otherwise run it on every mouse-move. Must be declared
+  // before the early returns below to keep hook order stable.
+  const hoverMeta = useMemo(() => {
+    if (!altHeld || !hoverInfo?.targetElement) return null;
+    const cs = window.getComputedStyle(hoverInfo.targetElement);
+    const fontFamily = (cs.fontFamily.split(",")[0] || cs.fontFamily)
+      .replace(/['"]/g, "")
+      .trim();
+    return {
+      font: `${cs.fontWeight} ${cs.fontSize}/${cs.lineHeight} ${fontFamily}`,
+      color: cs.color,
+      background: cs.backgroundColor,
+      padding: cs.padding,
+      margin: cs.margin,
+      radius: cs.borderRadius,
+    };
+  }, [altHeld, hoverInfo?.targetElement]);
+
   if (!mounted) return null;
   if (isToolbarHidden) return null;
 
@@ -4062,6 +4182,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               </span>
             </div>
 
+            {/* Copy feedback */}
             <div className={styles.buttonWrapper}>
               <button
                 className={`${styles.controlButton} ${copied ? styles.statusShowing : ""}`}
@@ -4083,7 +4204,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               </span>
             </div>
 
-            {/* Send button - only visible when webhook URL is available AND auto-send is off */}
+            {/* Manual webhook send — only when webhook is configured and
+                auto-send is off. No bulk-action-to-agent button for now. */}
             <div
               className={`${styles.buttonWrapper} ${styles.sendButtonWrapper} ${isActive && !settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.sendButtonVisible : ""}`}
             >
@@ -4110,9 +4232,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               >
                 <IconSendArrow size={24} state={sendState} />
                 {hasAnnotations && sendState === "idle" && (
-                  <span
-                    className={styles.buttonBadge}
-                  >
+                  <span className={styles.buttonBadge}>
                     {annotations.length}
                   </span>
                 )}
@@ -4376,10 +4496,14 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
           onClose={() => {
             setShowBubble(false);
             setBubbleCapturedElement(null);
+            // If the bubble was opened by clicking an element (v2), dismissing
+            // it should also drop the pending annotation outline/marker.
+            if (pendingAnnotation) cancelAnnotation();
           }}
           onOpenSettings={() => {
             setShowBubble(false);
             setBubbleCapturedElement(null);
+            if (pendingAnnotation) cancelAnnotation();
             setSettingsPage("automations");
             setShowSettings(true);
           }}
@@ -4387,6 +4511,30 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
           tasks={bubbleTasks}
           commandHistory={bubbleHistory}
           send={sendBubbleCommand}
+          onSubmit={
+            pendingAnnotation
+              ? (text: string, context: SendContext) => {
+                  // v2 element-scoped submit. Persist the annotation, then —
+                  // when agentMode is on — fire the agent and link the task
+                  // to the new annotation so the marker shows running/done.
+                  const newId = addAnnotation(text);
+                  if (
+                    newId &&
+                    settings.agentMode !== false &&
+                    endpoint &&
+                    currentSessionId
+                  ) {
+                    const taskId = sendBubbleCommand(text, context);
+                    if (taskId) {
+                      taskToAnnotationRef.current.set(taskId, newId);
+                      setAgentMarkerStates((prev) =>
+                        new Map(prev).set(newId, "running"),
+                      );
+                    }
+                  }
+                }
+              : undefined
+          }
         />
       )}
 
@@ -4592,6 +4740,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                 renumberFrom={renumberFrom}
                 markerClickBehavior={settings.markerClickBehavior}
                 tooltipStyle={getTooltipPosition(annotation)}
+                agentStatus={agentMarkerStates.get(annotation.id)}
                 onHoverEnter={(a) =>
                   !markersExiting &&
                   a.id !== recentlyAddedIdRef.current &&
@@ -4634,6 +4783,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                 renumberFrom={renumberFrom}
                 markerClickBehavior={settings.markerClickBehavior}
                 tooltipStyle={getTooltipPosition(annotation)}
+                agentStatus={agentMarkerStates.get(annotation.id)}
                 onHoverEnter={(a) =>
                   !markersExiting &&
                   a.id !== recentlyAddedIdRef.current &&
@@ -4802,31 +4952,80 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
               );
             })()}
 
-          {/* Hover tooltip */}
-          {hoverInfo && !pendingAnnotation && !isScrolling && !isDragging && (
-            <div
-              className={`${styles.hoverTooltip} ${styles.enter}`}
-              style={{
-                left: Math.max(
-                  8,
-                  Math.min(hoverPosition.x, window.innerWidth - 100),
-                ),
-                top: Math.max(
-                  hoverPosition.y - (hoverInfo.reactComponents ? 48 : 32),
-                  8,
-                ),
-              }}
-            >
-              {hoverInfo.reactComponents && (
-                <div className={styles.hoverReactPath}>
-                  {hoverInfo.reactComponents}
+          {/* v2 hover label — anchored to the element, expanded on Alt/Option */}
+          {hoverInfo?.rect &&
+            !pendingAnnotation &&
+            !isScrolling &&
+            !isDragging && (
+              <div
+                className={`${styles.hoverElementLabel} ${altHeld ? styles.hoverElementLabelExpanded : ""}`}
+                style={(() => {
+                  const r = hoverInfo.rect;
+                  // Approximate label height for flip detection — 28px for the
+                  // collapsed pill, ~120px when expanded.
+                  const estHeight = altHeld ? 120 : 28;
+                  const wantsBelow = r.bottom + estHeight + 8 < window.innerHeight;
+                  const top = wantsBelow ? r.bottom + 4 : Math.max(8, r.top - estHeight - 4);
+                  const left = Math.max(
+                    8,
+                    Math.min(r.left, window.innerWidth - 340),
+                  );
+                  return { left, top };
+                })()}
+              >
+                <div className={styles.hoverLabelHeader}>
+                  <span>{hoverInfo.elementName}</span>
+                  <span className={styles.hoverLabelDimensions}>
+                    {Math.round(hoverInfo.rect.width)}×
+                    {Math.round(hoverInfo.rect.height)}
+                  </span>
                 </div>
-              )}
-              <div className={styles.hoverElementName}>
-                {hoverInfo.elementName}
+                {altHeld && hoverMeta && (
+                  <div className={styles.hoverLabelDetails}>
+                    <span className={styles.hoverLabelDetailKey}>Margin</span>
+                    <span className={styles.hoverLabelDetailValue}>
+                      {hoverMeta.margin}
+                    </span>
+                    <span className={styles.hoverLabelDetailKey}>Padding</span>
+                    <span className={styles.hoverLabelDetailValue}>
+                      {hoverMeta.padding}
+                    </span>
+                    <span className={styles.hoverLabelDetailKey}>Font</span>
+                    <span className={styles.hoverLabelDetailValue}>
+                      {hoverMeta.font}
+                    </span>
+                    <span className={styles.hoverLabelDetailKey}>Color</span>
+                    <span className={styles.hoverLabelDetailValue}>
+                      <span
+                        className={styles.hoverLabelSwatch}
+                        style={{ background: hoverMeta.color }}
+                      />
+                      {hoverMeta.color}
+                    </span>
+                    <span className={styles.hoverLabelDetailKey}>
+                      Background
+                    </span>
+                    <span className={styles.hoverLabelDetailValue}>
+                      <span
+                        className={styles.hoverLabelSwatch}
+                        style={{ background: hoverMeta.background }}
+                      />
+                      {hoverMeta.background}
+                    </span>
+                    {hoverMeta.radius !== "0px" && (
+                      <>
+                        <span className={styles.hoverLabelDetailKey}>
+                          Radius
+                        </span>
+                        <span className={styles.hoverLabelDetailValue}>
+                          {hoverMeta.radius}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            )}
 
           {/* Pending annotation marker + popup */}
           {pendingAnnotation && (
@@ -4898,107 +5097,16 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                   ? pendingAnnotation.y
                   : pendingAnnotation.y - scrollY;
 
+                // v2: input is now handled by the cursor bubble. The
+                // pending-annotation block here only renders the marker
+                // and outline; AnnotationPopupCSS is reserved for editing.
                 return (
-                  <>
-                    <PendingMarker
-                      x={markerX}
-                      y={markerY}
-                      isMultiSelect={pendingAnnotation.isMultiSelect}
-                      isExiting={pendingExiting}
-                    />
-
-                    <AnnotationPopupCSS
-                      ref={popupRef}
-                      element={pendingAnnotation.element}
-                      selectedText={pendingAnnotation.selectedText}
-                      computedStyles={pendingAnnotation.computedStylesObj}
-                      placeholder={
-                        pendingAnnotation.element === "Area selection"
-                          ? "What should change in this area?"
-                          : pendingAnnotation.isMultiSelect
-                            ? "Feedback for this group of elements..."
-                            : "What should change?"
-                      }
-                      onSubmit={addAnnotation}
-                      onSubmitToAgent={endpoint ? (comment: string) => {
-                        // Capture annotation context before addAnnotation clears pendingAnnotation
-                        const context = pendingAnnotation ? {
-                          element: pendingAnnotation.element,
-                          elementPath: pendingAnnotation.elementPath,
-                          sourceFile: pendingAnnotation.sourceFile,
-                          nearbyText: pendingAnnotation.nearbyText,
-                          reactComponents: pendingAnnotation.reactComponents,
-                        } : null;
-
-                        const syncPromise = addAnnotation(comment);
-                        // Instant visual feedback
-                        setAgentActivity({ active: true, summary: "Working on it...", event: "tool_use" });
-                        setShowActivityLabel(true);
-
-                        // Build enriched message with annotation context
-                        const contextParts: string[] = [`Fix this annotation: "${comment}"`];
-                        if (context) {
-                          if (context.sourceFile) contextParts.push(`Source: ${context.sourceFile}`);
-                          if (context.nearbyText) contextParts.push(`Current text: "${context.nearbyText}"`);
-                          if (context.elementPath) contextParts.push(`Element: ${context.elementPath}`);
-                          if (context.reactComponents) contextParts.push(`React: ${context.reactComponents}`);
-                        }
-                        const enrichedMessage = contextParts.join("\n");
-
-                        // Fire agent immediately — don't wait for annotation sync
-                        // The enriched message contains all the context the agent needs
-                        if (currentSessionId) {
-                          fetch(`${endpoint}/chat/message`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              sessionId: currentSessionId,
-                              message: enrichedMessage,
-                            }),
-                          }).then(async (resp) => {
-                            if (!resp.ok) {
-                              setAgentActivity(null);
-                              setShowActivityLabel(false);
-                              return;
-                            }
-                            const reader = resp.body?.getReader();
-                            if (reader) {
-                              while (true) {
-                                const { done } = await reader.read();
-                                if (done) break;
-                              }
-                            }
-                          }).catch(() => {
-                            setAgentActivity(null);
-                            setShowActivityLabel(false);
-                          });
-                        }
-                      } : undefined}
-                      onCancel={cancelAnnotation}
-                      isExiting={pendingExiting}
-                      lightMode={!isDarkMode}
-                      accentColor={
-                        pendingAnnotation.isMultiSelect
-                          ? "var(--agentation-color-green)"
-                          : "var(--agentation-color-accent)"
-                      }
-                      style={{
-                        // Popup is 280px wide, centered with translateX(-50%), so 140px each side
-                        // Clamp so popup stays 20px from viewport edges
-                        left: Math.max(
-                          160,
-                          Math.min(
-                            window.innerWidth - 160,
-                            (markerX / 100) * window.innerWidth,
-                          ),
-                        ),
-                        // Position popup above or below marker to keep marker visible
-                        ...(markerY > window.innerHeight - 290
-                          ? { bottom: window.innerHeight - markerY + 20 }
-                          : { top: markerY + 20 }),
-                      }}
-                    />
-                  </>
+                  <PendingMarker
+                    x={markerX}
+                    y={markerY}
+                    isMultiSelect={pendingAnnotation.isMultiSelect}
+                    isExiting={pendingExiting}
+                  />
                 );
               })()}
             </>

@@ -16,6 +16,9 @@ type BubbleProps = {
   tasks: Task[];
   commandHistory: string[];
   send: (text: string, context: SendContext) => void;
+  // Optional override called instead of `send` when set. Used by the parent
+  // to handle element-scoped submits (annotation save + optional agent fire).
+  onSubmit?: (text: string, context: SendContext) => void;
 };
 
 const CURSOR_OFFSET_X = 10;
@@ -38,6 +41,7 @@ export function BubbleVariant({
   tasks,
   commandHistory,
   send,
+  onSubmit,
 }: BubbleProps) {
   const [input, setInput] = useState("");
   const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
@@ -215,11 +219,22 @@ export function BubbleVariant({
       ...(capturedElement ? { element: capturedElement } : {}),
     };
     lastSentRef.current = v;
+    if (onSubmit) {
+      // Element-scoped submit (annotation creation): the action is complete,
+      // dismiss the bubble. Open-channel staying-open is reserved for the
+      // global `/` command flow where send() is used directly.
+      onSubmit(v, context);
+      setInput("");
+      setHistoryIndex(null);
+      setHistoryDraft("");
+      onClose();
+      return;
+    }
     send(v, context);
     setInput("");
     setHistoryIndex(null);
     setHistoryDraft("");
-  }, [input, send, isDarkMode, capturedElement]);
+  }, [input, send, onSubmit, onClose, isDarkMode, capturedElement]);
 
   const navigateHistory = useCallback(
     (direction: "older" | "newer") => {
@@ -263,14 +278,8 @@ export function BubbleVariant({
         data-feedback-toolbar
       >
         <div className={styles.body}>
-          {capturedElement && (
-            <span
-              className={styles.targetChip}
-              title={capturedElement.path}
-            >
-              {capturedElement.name}
-            </span>
-          )}
+          {/* Element-scoped chip removed in v2 — the persistent element label
+              and outline already communicate scope; the bubble stays minimal. */}
           <input
             ref={inputRef}
             className={styles.input}

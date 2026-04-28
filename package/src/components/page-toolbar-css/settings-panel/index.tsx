@@ -308,6 +308,35 @@ export function SettingsPanel({
             <>
               <div className={styles.divider}></div>
               <ApiKeySection endpoint={endpoint} />
+
+              <div className={styles.divider}></div>
+
+              {/* Inline agent mode toggle: when on, submitting an annotation
+                  also fires the agent immediately. When off, the annotation is
+                  saved (and can still be sent later via copy or webhook). */}
+              <div className={styles.settingsSection}>
+                <div className={styles.settingsRow}>
+                  <span className={styles.automationHeader}>
+                    Inline agent mode
+                    <HelpTooltip content="When on, submitting an annotation immediately fires an AI agent to fix it. When off, annotations are saved without firing the agent." />
+                  </span>
+                  <div className={styles.autoSendContainer}>
+                    <label
+                      htmlFor="agentation-agent-mode"
+                      className={`${styles.autoSendLabel} ${settings.agentMode ? styles.active : ""}`}
+                    >
+                      {settings.agentMode ? "On" : "Off"}
+                    </label>
+                    <Switch
+                      id="agentation-agent-mode"
+                      checked={settings.agentMode}
+                      onChange={(e) =>
+                        onSettingsChange({ agentMode: e.target.checked })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
             </>
           )}
 

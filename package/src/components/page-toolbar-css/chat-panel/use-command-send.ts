@@ -100,10 +100,10 @@ export function useCommandSend(
   }, []);
 
   const send = useCallback(
-    (text: string, context: SendContext) => {
-      if (!endpoint || !sessionId) return;
+    (text: string, context: SendContext): string | null => {
+      if (!endpoint || !sessionId) return null;
       const message = text.trim();
-      if (!message) return;
+      if (!message) return null;
       const id = `t-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const controller = new AbortController();
       abortersRef.current.set(id, controller);
@@ -180,6 +180,8 @@ export function useCommandSend(
           scheduleRemove(id, REMOVE_ERROR_MS);
         }
       })();
+
+      return id;
     },
     [endpoint, sessionId, scheduleRemove, updateTask]
   );

@@ -1,6 +1,8 @@
 import { Annotation } from "../../../types";
-import { IconEdit, IconPlus, IconXmark } from "../../icons";
+import { IconCheck, IconEdit, IconPlus, IconXmark } from "../../icons";
 import styles from "./styles.module.scss";
+
+export type AnnotationMarkerAgentStatus = "running" | "done";
 
 type MarkerClickBehavior = "edit" | "delete";
 
@@ -23,6 +25,7 @@ type AnnotationMarkerProps = {
   renumberFrom: number | null;
   markerClickBehavior: MarkerClickBehavior;
   tooltipStyle?: React.CSSProperties;
+  agentStatus?: AnnotationMarkerAgentStatus;
   onHoverEnter: (annotation: Annotation) => void;
   onHoverLeave: () => void;
   onClick: (annotation: Annotation) => void;
@@ -43,6 +46,7 @@ export function AnnotationMarker({
   renumberFrom,
   markerClickBehavior,
   tooltipStyle,
+  agentStatus,
   onHoverEnter,
   onHoverLeave,
   onClick,
@@ -96,7 +100,11 @@ export function AnnotationMarker({
           : undefined
       }
     >
-      {showDeleteState ? (
+      {agentStatus === "running" ? (
+        <span className={styles.agentSpinner} aria-hidden />
+      ) : agentStatus === "done" ? (
+        <IconCheck size={14} />
+      ) : showDeleteState ? (
         showDeleteHover ? (
           <IconXmark size={isMulti ? 18 : 16} />
         ) : (
