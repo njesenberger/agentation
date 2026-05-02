@@ -100,8 +100,17 @@ export function getElementPath(target: HTMLElement, maxDepth = 4): string {
 /**
  * Identifies an element and returns a human-readable name + path
  */
-export function identifyElement(target: HTMLElement): { name: string; path: string } {
+export function identifyElement(
+  target: HTMLElement,
+): { name: string; path: string } {
   const path = getElementPath(target);
+
+  const MAX = 18;
+  const short = (text?: string) => {
+    if (!text) return "";
+    const t = text.trim().replace(/\s+/g, " ");
+    return t.length > MAX ? t.slice(0, MAX) + "…" : t;
+  };
 
   if (target.dataset.element) {
     return { name: target.dataset.element, path };
@@ -109,9 +118,8 @@ export function identifyElement(target: HTMLElement): { name: string; path: stri
 
   const tag = target.tagName.toLowerCase();
 
-  // SVG elements
+  // SVG
   if (["path", "circle", "rect", "line", "g"].includes(tag)) {
-    // Try to find parent SVG context (crossing shadow boundaries)
     const svg = closestCrossingShadow(target, "svg");
     if (svg) {
       const parent = getParentElement(svg);
@@ -122,91 +130,114 @@ export function identifyElement(target: HTMLElement): { name: string; path: stri
     }
     return { name: "graphic element", path };
   }
+
   if (tag === "svg") {
     const parent = getParentElement(target);
     if (parent?.tagName.toLowerCase() === "button") {
       const btnText = parent.textContent?.trim();
-      return { name: btnText ? `icon in "${btnText}" button` : "button icon", path };
+      return {
+        name: btnText
+          ? `icon in "${short(btnText)}" button`
+          : "button icon",
+        path,
+      };
     }
     return { name: "icon", path };
   }
 
-  // Interactive elements
+  // Interactive
   if (tag === "button") {
     const text = target.textContent?.trim();
     const ariaLabel = target.getAttribute("aria-label");
-    if (ariaLabel) return { name: `button [${ariaLabel}]`, path };
-    return { name: text ? `button "${text.slice(0, 25)}"` : "button", path };
+    if (ariaLabel) return { name: `button [${short(ariaLabel)}]`, path };
+    return { name: text ? `button "${short(text)}"` : "button", path };
   }
+
   if (tag === "a") {
     const text = target.textContent?.trim();
     const href = target.getAttribute("href");
-    if (text) return { name: `link "${text.slice(0, 25)}"`, path };
-    if (href) return { name: `link to ${href.slice(0, 30)}`, path };
+    if (text) return { name: `link "${short(text)}"`, path };
+    if (href) return { name: `link to ${short(href)}`, path };
     return { name: "link", path };
   }
+
   if (tag === "input") {
     const type = target.getAttribute("type") || "text";
     const placeholder = target.getAttribute("placeholder");
     const name = target.getAttribute("name");
-    if (placeholder) return { name: `input "${placeholder}"`, path };
-    if (name) return { name: `input [${name}]`, path };
+    if (placeholder) return { name: `input "${short(placeholder)}"`, path };
+    if (name) return { name: `input [${short(name)}]`, path };
     return { name: `${type} input`, path };
   }
 
   // Headings
   if (["h1", "h2", "h3", "h4", "h5", "h6"].includes(tag)) {
     const text = target.textContent?.trim();
-    return { name: text ? `${tag} "${text.slice(0, 35)}"` : tag, path };
+    return { name: text ? `${tag} "${short(text)}"` : tag, path };
   }
 
-  // Text elements
+  // Text
   if (tag === "p") {
     const text = target.textContent?.trim();
-    if (text) return { name: `paragraph: "${text.slice(0, 40)}${text.length > 40 ? '...' : ''}"`, path };
-    return { name: "paragraph", path };
+    return text
+      ? { name: `paragraph: "${short(text)}"`, path }
+      : { name: "paragraph", path };
   }
+
   if (tag === "span" || tag === "label") {
     const text = target.textContent?.trim();
-    if (text && text.length < 40) return { name: `"${text}"`, path };
-    return { name: tag, path };
+    return text
+      ? { name: `"${short(text)}"`, path }
+      : { name: tag, path };
   }
+
   if (tag === "li") {
     const text = target.textContent?.trim();
-    if (text && text.length < 40) return { name: `list item: "${text.slice(0, 35)}"`, path };
-    return { name: "list item", path };
+    return text
+      ? { name: `list item: ${short(text)}"`, path }
+      : { name: "list item", path };
   }
+
   if (tag === "blockquote") return { name: "blockquote", path };
+
   if (tag === "code") {
     const text = target.textContent?.trim();
-    if (text && text.length < 30) return { name: `code: \`${text}\``, path };
-    return { name: "code", path };
+    return text
+      ? { name: `code: \`${short(text)}\``, path }
+      : { name: "code", path };
   }
+
   if (tag === "pre") return { name: "code block", path };
 
   // Media
   if (tag === "img") {
     const alt = target.getAttribute("alt");
-    return { name: alt ? `image "${alt.slice(0, 30)}"` : "image", path };
+    return { name: alt ? `image: "${short(alt)}"` : "image", path };
   }
+
   if (tag === "video") return { name: "video", path };
 
-  // Containers - try to infer meaningful name
-  if (["div", "section", "article", "nav", "header", "footer", "aside", "main"].includes(tag)) {
+  // Containers
+  if (
+    ["div", "section", "article", "nav", "header", "footer", "aside", "main"].includes(
+      tag,
+    )
+  ) {
     const className = target.className;
     const role = target.getAttribute("role");
     const ariaLabel = target.getAttribute("aria-label");
 
-    if (ariaLabel) return { name: `${tag} [${ariaLabel}]`, path };
-    if (role) return { name: `${role}`, path };
+    if (ariaLabel) return { name: `${tag} [${short(ariaLabel)}]`, path };
+    if (role) return { name: role, path };
 
     if (typeof className === "string" && className) {
       const words = className
         .split(/[\s_-]+/)
-        .map((c) => c.replace(/[A-Z0-9]{5,}.*$/, "")) // Remove CSS module hashes
+        .map((c) => c.replace(/[A-Z0-9]{5,}.*$/, ""))
         .filter((c) => c.length > 2 && !/^[a-z]{1,2}$/.test(c))
         .slice(0, 2);
-      if (words.length > 0) return { name: words.join(" "), path };
+
+      if (words.length > 0) return { name: short(words.join(" ")), path };
     }
 
     return { name: tag === "div" ? "container" : tag, path };

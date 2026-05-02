@@ -123,16 +123,8 @@ export function AnnotationMarker({
       )}
 
       {isHovered && !isEditingAny && (
-        <div
-          className={`${styles.markerTooltip} ${styles.enter}`}
-          style={tooltipStyle}
-        >
-          <span className={styles.markerQuote}>
-            {annotation.element}
-            {annotation.selectedText &&
-              ` "${annotation.selectedText.slice(0, 30)}${annotation.selectedText.length > 30 ? "..." : ""}"`}
-          </span>
-          <span className={styles.markerNote}>{annotation.comment}</span>
+        <div className={`${styles.markerTooltip} ${styles.enter}`}>
+          {annotation.comment}
         </div>
       )}
     </div>

@@ -23,11 +23,7 @@
 @keyframes tooltipIn {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(2px) scale(0.891);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(0.909);
+    transform: scale(0.89);
   }
 }
 
@@ -90,7 +86,7 @@
   }
 
   &:not(.enter):not(.exit):not(.clearing):hover {
-    transform: translate(-50%, -50%) scale(1.1);
+    transform: translate(-50%, -50%);
   }
 
   &.pending {
@@ -126,14 +122,20 @@
 }
 
 .markerTooltip {
+  display: block;
   position: absolute;
-  top: calc(100% + 10px);
-  left: 50%;
-  transform: translateX(-50%) scale(0.909);
-  z-index: 100002;
-  background: #1a1a1a;
-  padding: 8px 0.75rem;
-  border-radius: 0.75rem;
+  z-index: 1;
+  top: 100%;
+  left: 100%;
+  border-radius: 4px 19px 19px;
+  padding: 10px 16px 10px 14px;
+  width: max-content;
+  max-width: 200px;
+  background-color: #1a1a1a;
+  box-shadow:
+    0 4px 20px rgb(0 0 0 / 0.3),
+    0 0 0 1px rgb(255 255 255 / 0.08);
+  overflow: hidden;
   font-family:
     system-ui,
     -apple-system,
@@ -141,15 +143,11 @@
     "Segoe UI",
     Roboto,
     sans-serif;
+  font-size: 14px;
   font-weight: 400;
   color: #fff;
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(255, 255, 255, 0.08);
-  min-width: 120px;
-  max-width: 200px;
-  pointer-events: none;
-  cursor: default;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 
   &.enter {
     animation: tooltipIn 0.1s ease-out forwards;
@@ -185,7 +183,9 @@
 // =============================================================================
 
 @keyframes agentSpinnerSpin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .agentSpinner {
