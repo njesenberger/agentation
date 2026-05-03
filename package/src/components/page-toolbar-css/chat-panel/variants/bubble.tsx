@@ -1,9 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import type {
-  ApiKeyState,
-  SendContext,
-  Task,
-} from "../use-command-send";
+import type { ApiKeyState, SendContext, Task } from "../use-command-send";
 import styles from "./bubble.module.scss";
 
 type BubbleProps = {
@@ -19,6 +15,8 @@ type BubbleProps = {
   // Optional override called instead of `send` when set. Used by the parent
   // to handle element-scoped submits (annotation save + optional agent fire).
   onSubmit?: (text: string, context: SendContext) => void;
+  /** When set, anchors the bubble to this position instead of the cursor. */
+  markerPosition?: { x: number; y: number };
 };
 
 const CURSOR_OFFSET_X = 10;
@@ -42,11 +40,12 @@ export function BubbleVariant({
   commandHistory,
   send,
   onSubmit,
+  markerPosition,
 }: BubbleProps) {
   const [input, setInput] = useState("");
   const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
   const [fakeCursor, setFakeCursor] = useState<{ x: number; y: number } | null>(
-    null
+    null,
   );
   // History navigation state. `index === null` = not navigating; otherwise
   // 0..history.length-1 where 0 is the newest command. `draft` preserves
@@ -82,6 +81,26 @@ export function BubbleVariant({
       setHistoryDraft("");
       return;
     }
+    // Element-scoped (placed via marker click): anchor to marker bottom-right,
+    // don't follow the cursor.
+    if (markerPosition) {
+      const MARKER_SIZE = 22;
+      const popupWidth = 220;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const scrollY = window.scrollY;
+      let x = markerPosition.x + MARKER_SIZE / 2;
+      let y = markerPosition.y + MARKER_SIZE / 2; // document coords
+      // Clamp so bubble doesn't overflow right edge
+      if (x + popupWidth > vw - MARGIN)
+        x = Math.max(MARGIN, vw - popupWidth - MARGIN);
+      // Clamp using viewport coords for overflow check, but store as document coords
+      if (y - scrollY + APPROX_HEIGHT > vh - MARGIN)
+        y = Math.max(scrollY + MARGIN, scrollY + vh - APPROX_HEIGHT - MARGIN);
+      setAnchor({ x, y });
+      return;
+    }
+    // Global cursor bubble: anchor near cursor
     const { x, y } = lastCursor.current;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -89,18 +108,19 @@ export function BubbleVariant({
       x: clamp(
         (x || vw / 2) + CURSOR_OFFSET_X,
         MARGIN,
-        vw - APPROX_WIDTH - MARGIN
+        vw - APPROX_WIDTH - MARGIN,
       ),
       y: clamp(
         (y || vh / 2) + CURSOR_OFFSET_Y,
         MARGIN,
-        vh - APPROX_HEIGHT - MARGIN
+        vh - APPROX_HEIGHT - MARGIN,
       ),
     });
-  }, [isVisible]);
+  }, [isVisible, markerPosition]);
 
+  // Only follow the cursor when NOT anchored to a marker
   useEffect(() => {
-    if (!isVisible) return;
+    if (!isVisible || markerPosition) return;
     const onMove = (e: MouseEvent) => {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
@@ -108,18 +128,18 @@ export function BubbleVariant({
         x: clamp(
           e.clientX + CURSOR_OFFSET_X,
           MARGIN,
-          vw - APPROX_WIDTH - MARGIN
+          vw - APPROX_WIDTH - MARGIN,
         ),
         y: clamp(
           e.clientY + CURSOR_OFFSET_Y,
           MARGIN,
-          vh - APPROX_HEIGHT - MARGIN
+          vh - APPROX_HEIGHT - MARGIN,
         ),
       });
     };
     window.addEventListener("mousemove", onMove, { passive: true });
     return () => window.removeEventListener("mousemove", onMove);
-  }, [isVisible]);
+  }, [isVisible, markerPosition]);
 
   // Focus the input whenever the bubble is visible — including in the
   // no-API-key state so the user can still press Enter to open Settings.
@@ -255,7 +275,7 @@ export function BubbleVariant({
         });
       }
     },
-    [commandHistory.length, input]
+    [commandHistory.length, input],
   );
 
   // Sync input with the currently navigated history entry (or the draft).
@@ -267,14 +287,16 @@ export function BubbleVariant({
 
   if (!anchor) return null;
 
-  const size = Math.max(16, Math.min(42, input.length + 1));
-
   return (
     <>
       <div
         ref={rootRef}
         className={`${styles.bubble} ${!isDarkMode ? styles.light : ""} ${isVisible ? styles.enter : styles.exit}`}
-        style={{ left: anchor.x, top: anchor.y }}
+        style={{
+          left: anchor.x,
+          top: anchor.y,
+          position: markerPosition ? "absolute" : undefined, // absolute = scrolls with page
+        }}
         data-feedback-toolbar
       >
         <div className={styles.body}>
@@ -285,13 +307,12 @@ export function BubbleVariant({
             className={styles.input}
             type="text"
             value={input}
-            size={size}
             placeholder={
-              needsApiKey
+              needsApiKey && !onSubmit
                 ? "Press ↵ to add an API key…"
                 : capturedElement
-                  ? "Change this to…"
-                  : "Make a change…"
+                  ? "What should change?"
+                  : "Global change…"
             }
             onChange={(e) => {
               // Any user-driven change exits history navigation so subsequent
@@ -306,7 +327,9 @@ export function BubbleVariant({
               e.stopPropagation();
               if (e.key === "Enter") {
                 e.preventDefault();
-                if (needsApiKey) {
+                // When onSubmit is provided (element-scoped annotation), bypass API key
+                // check entirely — we're just saving an annotation, not calling the agent.
+                if (needsApiKey && !onSubmit) {
                   onOpenSettings();
                   return;
                 }
@@ -380,13 +403,7 @@ export function BubbleVariant({
   );
 }
 
-function TaskPill({
-  task,
-  onDismiss,
-}: {
-  task: Task;
-  onDismiss?: () => void;
-}) {
+function TaskPill({ task, onDismiss }: { task: Task; onDismiss?: () => void }) {
   const dotClass =
     task.status === "running"
       ? styles.dotRunning

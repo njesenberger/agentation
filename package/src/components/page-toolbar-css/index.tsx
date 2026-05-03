@@ -524,6 +524,10 @@ export function PageFeedbackToolbarCSS({
     name: string;
     path: string;
   } | null>(null);
+  const [bubbleMarkerPosition, setBubbleMarkerPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const bubbleCursorRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [settingsPage, setSettingsPage] = useState<"main" | "automations">(
     "main",
@@ -858,7 +862,6 @@ export function PageFeedbackToolbarCSS({
   // layouts, or `/` with shiftKey on others) attaches the element under the
   // cursor as context so the agent can target it specifically.
   useEffect(() => {
-    if (!endpoint || !currentSessionId) return;
     const onKeyDown = (e: KeyboardEvent) => {
       const isSlashKey = e.key === "/" || e.key === "?" || e.code === "Slash";
       if (!isSlashKey) return;
@@ -2552,6 +2555,10 @@ export function PageFeedbackToolbarCSS({
       // v2: route new annotations through the cursor bubble. The element
       // outline still draws via pendingAnnotation; the bubble owns input.
       setBubbleCapturedElement({ name, path });
+      setBubbleMarkerPosition({
+        x: e.clientX,
+        y: e.clientY + window.scrollY, // document coords, scrolls with page
+      });
       setShowBubble(true);
     };
 
@@ -4928,6 +4935,7 @@ export function PageFeedbackToolbarCSS({
         onClose={() => {
           setShowBubble(false);
           setBubbleCapturedElement(null);
+          setBubbleMarkerPosition(null);
           // If the bubble was opened by clicking an element (v2), dismissing
           // it should also drop the pending annotation outline/marker.
           if (pendingAnnotation) cancelAnnotation();
@@ -4935,6 +4943,7 @@ export function PageFeedbackToolbarCSS({
         onOpenSettings={() => {
           setShowBubble(false);
           setBubbleCapturedElement(null);
+          setBubbleMarkerPosition(null);
           if (pendingAnnotation) cancelAnnotation();
           setSettingsPage("automations");
           setShowSettings(true);
@@ -4967,6 +4976,7 @@ export function PageFeedbackToolbarCSS({
               }
             : undefined
         }
+        markerPosition={bubbleMarkerPosition ?? undefined}
       />
 
       {/* v2 hover label — anchored to the element, expanded on Alt/Option */}
