@@ -1,4 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+} from "react";
 import type { ApiKeyState, SendContext, Task } from "../use-command-send";
 import styles from "./bubble.module.scss";
 
@@ -62,6 +68,13 @@ export function BubbleVariant({
   const rootRef = useRef<HTMLDivElement>(null);
 
   const needsApiKey = apiKey.configured === false;
+
+  const placeholder =
+    needsApiKey && !onSubmit
+      ? "Press ↵ to add an API key…"
+      : capturedElement
+        ? "What should change?"
+        : "Global change…";
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -285,6 +298,39 @@ export function BubbleVariant({
     if (typeof next === "string") setInput(next);
   }, [historyIndex, commandHistory]);
 
+  // Auto-size input width using a temporary mirror span
+  useLayoutEffect(() => {
+    const inp = inputRef.current;
+    if (!inp) return;
+
+    const measure = () => {
+      const mirror = document.createElement("span");
+      mirror.style.position = "absolute";
+      mirror.style.top = "-9999px";
+      mirror.style.left = "-9999px";
+      mirror.style.visibility = "hidden";
+      mirror.style.whiteSpace = "pre";
+      mirror.style.pointerEvents = "none";
+      document.body.appendChild(mirror);
+
+      const cs = window.getComputedStyle(inp);
+      mirror.style.font = cs.font;
+      mirror.style.letterSpacing = cs.letterSpacing;
+      mirror.textContent = input || placeholder;
+
+      const paddingLeft = parseFloat(cs.paddingLeft);
+      const paddingRight = parseFloat(cs.paddingRight);
+      const w = Math.min(mirror.offsetWidth + paddingLeft + paddingRight, 200);
+      inp.style.width = `${w}px`;
+
+      document.body.removeChild(mirror);
+    };
+
+    measure();
+    const raf = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(raf);
+  }, [input, placeholder, isVisible, anchor]);
+
   if (!anchor) return null;
 
   return (
@@ -295,7 +341,7 @@ export function BubbleVariant({
         style={{
           left: anchor.x,
           top: anchor.y,
-          position: markerPosition ? "absolute" : undefined, // absolute = scrolls with page
+          position: markerPosition ? "absolute" : undefined,
         }}
         data-feedback-toolbar
       >
@@ -307,13 +353,8 @@ export function BubbleVariant({
             className={styles.input}
             type="text"
             value={input}
-            placeholder={
-              needsApiKey && !onSubmit
-                ? "Press ↵ to add an API key…"
-                : capturedElement
-                  ? "What should change?"
-                  : "Global change…"
-            }
+            style={{ width: undefined, maxWidth: 200, minWidth: 0 }}
+            placeholder={placeholder}
             onChange={(e) => {
               // Any user-driven change exits history navigation so subsequent
               // ↑/↓ restart from the new draft.

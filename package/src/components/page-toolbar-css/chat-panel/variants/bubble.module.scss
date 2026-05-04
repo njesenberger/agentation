@@ -60,8 +60,6 @@
   align-items: center;
   gap: 6px;
   border-radius: 4px 19px 19px;
-  padding: 10px 16px 10px 14px;
-  max-width: 200px;
   background-color: currentColor;
 }
 
@@ -182,6 +180,7 @@
 }
 
 .input {
+  padding: 10px 16px 10px 14px;
   min-width: 0;
   background: transparent;
   border: none;
@@ -191,8 +190,6 @@
   line-height: 1;
   font-family: inherit;
   caret-color: rgba(74, 158, 255, 0.95);
-  padding: 0;
-  transition: width 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 
   &::placeholder {
     color: rgba(255, 255, 255, 0.4);

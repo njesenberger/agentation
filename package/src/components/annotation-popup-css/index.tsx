@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useLayoutEffect } from "react";
 import styles from "./styles.module.scss";
 import { IconTrash } from "../icons";
 import { originalSetTimeout } from "../../utils/freeze-animations";
@@ -79,6 +79,39 @@ export const AnnotationPopupCSS = ({
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-size input width using a temporary mirror span
+  useLayoutEffect(() => {
+    const inp = inputRef.current;
+    if (!inp) return;
+
+    const measure = () => {
+      const mirror = document.createElement("span");
+      mirror.style.position = "absolute";
+      mirror.style.top = "-9999px";
+      mirror.style.left = "-9999px";
+      mirror.style.visibility = "hidden";
+      mirror.style.whiteSpace = "pre";
+      mirror.style.pointerEvents = "none";
+      document.body.appendChild(mirror);
+
+      const cs = window.getComputedStyle(inp);
+      mirror.style.font = cs.font;
+      mirror.style.letterSpacing = cs.letterSpacing;
+      mirror.textContent = text || placeholder;
+
+      const paddingLeft = parseFloat(cs.paddingLeft);
+      const paddingRight = parseFloat(cs.paddingRight);
+      const w = Math.min(mirror.offsetWidth + paddingLeft + paddingRight, 200);
+      inp.style.width = `${w}px`;
+
+      document.body.removeChild(mirror);
+    };
+
+    measure();
+    const raf = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(raf);
+  }, [text, placeholder]);
 
   // Handle cancel with exit animation
   const handleCancel = useCallback(() => {
