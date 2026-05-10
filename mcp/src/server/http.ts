@@ -32,7 +32,12 @@ import {
   handleChatMessage,
   clearChatHistory,
 } from "./chat.js";
-import type { Annotation, AFSEvent, ActionRequest, AgentStatusPayload } from "../types.js";
+import type {
+  Annotation,
+  AFSEvent,
+  ActionRequest,
+  AgentStatusPayload,
+} from "../types.js";
 
 /**
  * Log to stderr so diagnostic output never corrupts the MCP stdio channel.
@@ -79,17 +84,22 @@ const mcpTransports = new Map<string, StreamableHTTPServerTransport>();
 /**
  * Initialize a new MCP server with HTTP transport for a session.
  */
-function createMcpSession(): { server: Server; transport: StreamableHTTPServerTransport } {
+function createMcpSession(): {
+  server: Server;
+  transport: StreamableHTTPServerTransport;
+} {
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => crypto.randomUUID(),
   });
 
   const server = new Server(
     { name: "agentation", version: "0.0.1" },
-    { capabilities: { tools: {} } }
+    { capabilities: { tools: {} } },
   );
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: TOOLS,
+  }));
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
     try {
       return await handleTool(req.params.name, req.params.arguments);
@@ -160,9 +170,7 @@ function sendWebhooks(actionRequest: ActionRequest): void {
       body: payload,
     })
       .then((res) => {
-        log(
-          `[Webhook] POST ${url} -> ${res.status} ${res.statusText}`
-        );
+        log(`[Webhook] POST ${url} -> ${res.status} ${res.statusText}`);
       })
       .catch((err) => {
         console.error(`[Webhook] POST ${url} failed:`, (err as Error).message);
@@ -170,7 +178,7 @@ function sendWebhooks(actionRequest: ActionRequest): void {
   }
 
   log(
-    `[Webhook] Fired ${webhookUrls.length} webhook(s) for session ${actionRequest.sessionId}`
+    `[Webhook] Fired ${webhookUrls.length} webhook(s) for session ${actionRequest.sessionId}`,
   );
 }
 
@@ -196,10 +204,14 @@ function summarizeBashCommand(command: string): string | null {
   const cmd = command.trim();
 
   // Build commands
-  if (/\b(pnpm|npm|yarn|bun)\s+(build|run build)/.test(cmd)) return "Building project";
-  if (/\b(pnpm|npm|yarn|bun)\s+(dev|run dev|start)/.test(cmd)) return "Starting dev server";
-  if (/\b(pnpm|npm|yarn|bun)\s+install/.test(cmd)) return "Installing dependencies";
-  if (/\b(pnpm|npm|yarn|bun)\s+(test|run test)/.test(cmd)) return "Running tests";
+  if (/\b(pnpm|npm|yarn|bun)\s+(build|run build)/.test(cmd))
+    return "Building project";
+  if (/\b(pnpm|npm|yarn|bun)\s+(dev|run dev|start)/.test(cmd))
+    return "Starting dev server";
+  if (/\b(pnpm|npm|yarn|bun)\s+install/.test(cmd))
+    return "Installing dependencies";
+  if (/\b(pnpm|npm|yarn|bun)\s+(test|run test)/.test(cmd))
+    return "Running tests";
   if (/\btsc\b/.test(cmd)) return "Type-checking";
 
   // Not useful to show — git, curl, grep, ls, etc. are just the agent thinking
@@ -209,7 +221,10 @@ function summarizeBashCommand(command: string): string | null {
 /**
  * Summarize an Agentation MCP tool call for the toolbar.
  */
-function summarizeAgentationTool(toolName: string, toolInput: Record<string, unknown> | undefined): string | null {
+function summarizeAgentationTool(
+  toolName: string,
+  toolInput: Record<string, unknown> | undefined,
+): string | null {
   const shortName = toolName.replace("mcp__agentation__agentation_", "");
   switch (shortName) {
     case "get_all_pending":
@@ -233,7 +248,9 @@ function summarizeAgentationTool(toolName: string, toolInput: Record<string, unk
   }
 }
 
-function parseAgentStatusPayload(body: Record<string, unknown>): AgentStatusPayload | null {
+function parseAgentStatusPayload(
+  body: Record<string, unknown>,
+): AgentStatusPayload | null {
   const hookEvent = body.hook_event_name as string | undefined;
   const now = new Date().toISOString();
 
@@ -247,17 +264,37 @@ function parseAgentStatusPayload(body: Record<string, unknown>): AgentStatusPayl
         if (toolName === "Edit" || toolName === "Write") {
           const filePath = toolInput?.file_path as string | undefined;
           const fileName = filePath ? filePath.split("/").pop() : "a file";
-          return { event: "tool_use", summary: `Editing ${fileName}`, active: true, tool_name: toolName, timestamp: now };
+          return {
+            event: "tool_use",
+            summary: `Editing ${fileName}`,
+            active: true,
+            tool_name: toolName,
+            timestamp: now,
+          };
         }
         if (toolName === "Bash") {
           const command = toolInput?.command as string | undefined;
           const summary = command ? summarizeBashCommand(command) : null;
-          if (summary) return { event: "tool_use", summary, active: true, tool_name: toolName, timestamp: now };
+          if (summary)
+            return {
+              event: "tool_use",
+              summary,
+              active: true,
+              tool_name: toolName,
+              timestamp: now,
+            };
         }
         // Agentation MCP tools — show annotation activity
         if (toolName?.startsWith("mcp__agentation__")) {
           const summary = summarizeAgentationTool(toolName, toolInput);
-          if (summary) return { event: "tool_use", summary, active: true, tool_name: toolName, timestamp: now };
+          if (summary)
+            return {
+              event: "tool_use",
+              summary,
+              active: true,
+              tool_name: toolName,
+              timestamp: now,
+            };
         }
         // Read, Glob, Grep, Agent, etc. — skip, it's just the agent thinking
         return null;
@@ -267,23 +304,47 @@ function parseAgentStatusPayload(body: Record<string, unknown>): AgentStatusPayl
         const summary = errorMsg
           ? `Error: ${errorMsg.slice(0, 60)}${errorMsg.length > 60 ? "…" : ""}`
           : "Something failed";
-        return { event: "error", summary, active: true, tool_name: toolName, timestamp: now };
+        return {
+          event: "error",
+          summary,
+          active: true,
+          tool_name: toolName,
+          timestamp: now,
+        };
       }
       case "Stop":
-        return { event: "stopped", summary: "Finished", active: false, timestamp: now };
+        return {
+          event: "stopped",
+          summary: "Finished",
+          active: false,
+          timestamp: now,
+        };
       case "SessionEnd":
-        return { event: "stopped", summary: "Session ended", active: false, timestamp: now };
+        return {
+          event: "stopped",
+          summary: "Session ended",
+          active: false,
+          timestamp: now,
+        };
       case "PermissionRequest": {
         // PermissionRequest gives us tool_name + tool_input for richer context
         let summary = "Needs permission";
         if (toolName === "Edit" || toolName === "Write") {
           const filePath = toolInput?.file_path as string | undefined;
           const fileName = filePath ? filePath.split("/").pop() : undefined;
-          summary = fileName ? `Needs permission to edit ${fileName}` : "Needs permission to edit";
+          summary = fileName
+            ? `Needs permission to edit ${fileName}`
+            : "Needs permission to edit";
         } else if (toolName === "Bash") {
           summary = "Needs permission to run command";
         }
-        return { event: "notification", summary, active: true, tool_name: toolName, timestamp: now };
+        return {
+          event: "notification",
+          summary,
+          active: true,
+          tool_name: toolName,
+          timestamp: now,
+        };
       }
       // PreToolUse, SessionStart, Notification — not useful to show
       default:
@@ -433,7 +494,7 @@ function handleCors(res: ServerResponse): void {
 async function proxyToCloud(
   req: IncomingMessage,
   res: ServerResponse,
-  pathname: string
+  pathname: string,
 ): Promise<void> {
   const method = req.method || "GET";
   const cloudUrl = `${CLOUD_API_URL}${pathname}`;
@@ -495,7 +556,8 @@ async function proxyToCloud(
     // Handle regular JSON responses
     const data = await cloudRes.text();
     res.writeHead(cloudRes.status, {
-      "Content-Type": cloudRes.headers.get("content-type") || "application/json",
+      "Content-Type":
+        cloudRes.headers.get("content-type") || "application/json",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
@@ -514,7 +576,7 @@ async function proxyToCloud(
 type RouteHandler = (
   req: IncomingMessage,
   res: ServerResponse,
-  params: Record<string, string>
+  params: Record<string, string>,
 ) => Promise<void>;
 
 /**
@@ -561,10 +623,17 @@ const getSessionHandler: RouteHandler = async (_req, res, params) => {
  */
 const addAnnotationHandler: RouteHandler = async (req, res, params) => {
   try {
-    const body = await parseBody<Omit<Annotation, "id" | "sessionId" | "status" | "createdAt">>(req);
+    const body =
+      await parseBody<
+        Omit<Annotation, "id" | "sessionId" | "status" | "createdAt">
+      >(req);
 
     if (!body.comment || !body.element || !body.elementPath) {
-      return sendError(res, 400, "comment, element, and elementPath are required");
+      return sendError(
+        res,
+        400,
+        "comment, element, and elementPath are required",
+      );
     }
 
     const annotation = addAnnotation(params.id, body);
@@ -638,7 +707,9 @@ const getPendingHandler: RouteHandler = async (_req, res, params) => {
  */
 const getAllPendingHandler: RouteHandler = async (_req, res) => {
   const sessions = listSessions();
-  const allPending = sessions.flatMap((session) => getPendingAnnotations(session.id));
+  const allPending = sessions.flatMap((session) =>
+    getPendingAnnotations(session.id),
+  );
   sendJson(res, 200, { count: allPending.length, annotations: allPending });
 };
 
@@ -706,7 +777,9 @@ const requestActionHandler: RouteHandler = async (req, res, params) => {
  */
 const addThreadHandler: RouteHandler = async (req, res, params) => {
   try {
-    const body = await parseBody<{ role: "human" | "agent"; content: string }>(req);
+    const body = await parseBody<{ role: "human" | "agent"; content: string }>(
+      req,
+    );
 
     if (!body.role || !body.content) {
       return sendError(res, 400, "role and content are required");
@@ -772,14 +845,20 @@ const sseHandler: RouteHandler = async (req, res, params) => {
   }
 
   // Subscribe to session events
-  const unsubscribeSession = eventBus.subscribeToSession(sessionId, (event: AFSEvent) => {
-    sendSSEEvent(res, event);
-  });
+  const unsubscribeSession = eventBus.subscribeToSession(
+    sessionId,
+    (event: AFSEvent) => {
+      sendSSEEvent(res, event);
+    },
+  );
 
   // Also subscribe to global events (agent activity) via __global__ session
-  const unsubscribeGlobal = eventBus.subscribeToSession("__global__", (event: AFSEvent) => {
-    sendSSEEvent(res, event);
-  });
+  const unsubscribeGlobal = eventBus.subscribeToSession(
+    "__global__",
+    (event: AFSEvent) => {
+      sendSSEEvent(res, event);
+    },
+  );
 
   // Keep connection alive with periodic comments
   const keepAlive = setInterval(() => {
@@ -863,7 +942,9 @@ const globalSseHandler: RouteHandler = async (req, res) => {
       }
     }
     // Send a sync.complete event so agents know initial sync is done
-    res.write(`event: sync.complete\ndata: ${JSON.stringify({ domain: domain ?? "all", count: syncCount, timestamp: new Date().toISOString() })}\n\n`);
+    res.write(
+      `event: sync.complete\ndata: ${JSON.stringify({ domain: domain ?? "all", count: syncCount, timestamp: new Date().toISOString() })}\n\n`,
+    );
   }
 
   // Subscribe to all events, optionally filter by domain
@@ -904,14 +985,20 @@ const globalSseHandler: RouteHandler = async (req, res) => {
  * Handle MCP protocol requests at /mcp endpoint.
  * Supports POST (requests), GET (SSE stream), and DELETE (session cleanup).
  */
-async function handleMcp(req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function handleMcp(
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<void> {
   const method = req.method || "GET";
   const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
   // Add CORS headers to all responses
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Mcp-Session-Id");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Accept, Mcp-Session-Id",
+  );
   res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
 
   // POST: Handle JSON-RPC requests
@@ -922,11 +1009,16 @@ async function handleMcp(req: IncomingMessage, res: ServerResponse): Promise<voi
       // Session ID provided - must exist in our map
       if (!mcpTransports.has(sessionId)) {
         res.writeHead(404, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          jsonrpc: "2.0",
-          error: { code: -32000, message: "Session not found. Please re-initialize." },
-          id: null
-        }));
+        res.end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            error: {
+              code: -32000,
+              message: "Session not found. Please re-initialize.",
+            },
+            id: null,
+          }),
+        );
         return;
       }
       transport = mcpTransports.get(sessionId)!;
@@ -1051,9 +1143,12 @@ const chatMessageHandler: RouteHandler = async (req, res) => {
   // Normalise context — only forward fields that look sane.
   const context = body.context
     ? {
-        url: typeof body.context.url === "string" ? body.context.url : undefined,
+        url:
+          typeof body.context.url === "string" ? body.context.url : undefined,
         title:
-          typeof body.context.title === "string" ? body.context.title : undefined,
+          typeof body.context.title === "string"
+            ? body.context.title
+            : undefined,
         viewport:
           body.context.viewport &&
           typeof body.context.viewport.width === "number" &&
@@ -1212,7 +1307,7 @@ const routes: Route[] = [
  */
 function matchRoute(
   method: string,
-  pathname: string
+  pathname: string,
 ): { handler: RouteHandler; params: Record<string, string> } | null {
   for (const route of routes) {
     if (route.method !== method) continue;
@@ -1269,7 +1364,10 @@ export function startHttpServer(port: number, apiKey?: string): void {
 
     // Health check (always local)
     if (pathname === "/health" && method === "GET") {
-      return sendJson(res, 200, { status: "ok", mode: isCloudMode() ? "cloud" : "local" });
+      return sendJson(res, 200, {
+        status: "ok",
+        mode: isCloudMode() ? "cloud" : "local",
+      });
     }
 
     // Status endpoint (always local)
@@ -1288,6 +1386,12 @@ export function startHttpServer(port: number, apiKey?: string): void {
     if (pathname === "/agent-status") {
       if (method === "POST") return postAgentStatusHandler(req, res, {});
       if (method === "GET") return getAgentStatusHandler(req, res, {});
+    }
+
+    // Chat API key endpoints (always local - local agent configuration)
+    if (pathname === "/chat/api-key") {
+      if (method === "POST") return setChatApiKeyHandler(req, res, {});
+      if (method === "GET") return getChatApiKeyHandler(req, res, {});
     }
 
     // MCP protocol endpoint (always local - allows Claude Code to connect)
@@ -1316,7 +1420,9 @@ export function startHttpServer(port: number, apiKey?: string): void {
 
   server.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE") {
-      log(`[HTTP] Port ${port} already in use — checking if existing server is agentation...`);
+      log(
+        `[HTTP] Port ${port} already in use — checking if existing server is agentation...`,
+      );
       // Check if the existing server is an agentation instance we can reuse
       fetch(`http://localhost:${port}/health`)
         .then((res) => res.json())
@@ -1324,7 +1430,9 @@ export function startHttpServer(port: number, apiKey?: string): void {
           const health = data as Record<string, unknown>;
           if (health?.status === "ok") {
             httpServerUp = true;
-            log(`[HTTP] Found existing agentation server on port ${port} — reusing it`);
+            log(
+              `[HTTP] Found existing agentation server on port ${port} — reusing it`,
+            );
           } else {
             httpServerError = `Port ${port} is in use by another application. Run: lsof -i :${port} to find it.`;
             log(`[HTTP] Port ${port} is in use by a non-agentation process`);
@@ -1332,7 +1440,9 @@ export function startHttpServer(port: number, apiKey?: string): void {
         })
         .catch(() => {
           httpServerError = `Port ${port} is in use and not responding. Run: lsof -i :${port} to find it.`;
-          log(`[HTTP] Port ${port} is in use and not responding to health check`);
+          log(
+            `[HTTP] Port ${port} is in use and not responding to health check`,
+          );
         });
     } else {
       httpServerError = err.message;
@@ -1343,7 +1453,9 @@ export function startHttpServer(port: number, apiKey?: string): void {
   server.listen(port, () => {
     httpServerUp = true;
     if (isCloudMode()) {
-      log(`[HTTP] Agentation server listening on http://localhost:${port} (cloud mode)`);
+      log(
+        `[HTTP] Agentation server listening on http://localhost:${port} (cloud mode)`,
+      );
     } else {
       log(`[HTTP] Agentation server listening on http://localhost:${port}`);
     }

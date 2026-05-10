@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { HelpTooltip } from "../../help-tooltip";
+import { Switch } from "../../switch";
 import styles from "./styles.module.scss";
 
 type ApiKeyState =
@@ -9,9 +10,15 @@ type ApiKeyState =
 
 type Props = {
   endpoint: string;
+  agentMode: boolean;
+  onAgentModeChange: (enabled: boolean) => void;
 };
 
-export function ApiKeySection({ endpoint }: Props) {
+export function ApiKeySection({
+  endpoint,
+  agentMode,
+  onAgentModeChange,
+}: Props) {
   const [state, setState] = useState<ApiKeyState>({ configured: null });
   const [input, setInput] = useState("");
   const [editing, setEditing] = useState(false);
@@ -27,7 +34,7 @@ export function ApiKeySection({ endpoint }: Props) {
         setState(
           d.configured
             ? { configured: true, provider: d.provider ?? null }
-            : { configured: false }
+            : { configured: false },
         );
       })
       .catch(() => {
@@ -41,7 +48,6 @@ export function ApiKeySection({ endpoint }: Props) {
   const save = useCallback(async () => {
     if (!input.trim()) return;
     setSaving(true);
-    setError(null);
     try {
       const res = await fetch(`${endpoint}/chat/api-key`, {
         method: "POST",
@@ -50,12 +56,10 @@ export function ApiKeySection({ endpoint }: Props) {
       });
       const data = await res.json();
       if (data.success) {
-        setState({
-          configured: true,
-          provider: data.provider ?? null,
-        });
+        setState({ configured: true, provider: data.provider ?? null });
         setInput("");
         setEditing(false);
+        setError(null);
       } else {
         setError(data.error || "Couldn't save that key.");
       }
@@ -73,32 +77,52 @@ export function ApiKeySection({ endpoint }: Props) {
         ? "GPT"
         : null;
 
-  const showInput = state.configured === false || editing;
+  const showInput = editing;
 
   return (
     <div className={styles.settingsSection}>
+      {/* Header row: title + provider pill + toggle */}
       <div className={styles.settingsRow}>
         <span className={styles.automationHeader}>
-          AI API Key
-          <HelpTooltip content="Used for the cursor-bubble command (/) to send code edits to an AI agent." />
+          Agent Mode
+          {state.configured === true && providerLabel && (
+            <span
+              className={styles.apiKeyBadge}
+              title="Provider detected from key"
+            >
+              {providerLabel}
+            </span>
+          )}
         </span>
-        {state.configured === true && providerLabel && (
-          <span className={styles.apiKeyBadge} title="Provider detected from key">
-            {providerLabel}
-          </span>
-        )}
+        <div className={styles.autoSendContainer}>
+          <Switch
+            id="agentation-agent-mode"
+            checked={agentMode}
+            onChange={(e) => onAgentModeChange(e.target.checked)}
+            disabled={state.configured !== true}
+          />
+        </div>
       </div>
 
-      {state.configured === true && !editing && (
-        <p
-          className={styles.automationDescription}
-          style={{ paddingBottom: 6 }}
-        >
-          Connected. Bubble commands will route through this key.{" "}
+      {/* Description + key action link */}
+      <p className={styles.automationDescription} style={{ paddingBottom: 6 }}>
+        Agent mode allows an agent to directly act on annotations.{" "}
+        {state.configured === null ? (
+          <span>Checking…</span>
+        ) : (
           <button
             type="button"
             className={styles.learnMoreLink}
-            onClick={() => setEditing(true)}
+            onClick={() => {
+              if (editing) {
+                setEditing(false);
+                setInput("");
+                setError(null);
+              } else {
+                setEditing(true);
+                setError(null);
+              }
+            }}
             style={{
               background: "none",
               border: 0,
@@ -107,80 +131,53 @@ export function ApiKeySection({ endpoint }: Props) {
               font: "inherit",
             }}
           >
-            Replace key
+            {editing
+              ? "Cancel"
+              : state.configured === false
+                ? "Add API key"
+                : "Edit API key"}
           </button>
-        </p>
-      )}
-
-      {state.configured === null && (
-        <p className={styles.automationDescription} style={{ paddingBottom: 6 }}>
-          Checking…
-        </p>
-      )}
-
-      {showInput && (
-        <>
-          <p className={styles.automationDescription}>
-            Paste an Anthropic or OpenAI key to enable the cursor-bubble
-            commands.{" "}
-            <a
-              href="https://console.anthropic.com/settings/keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.learnMoreLink}
-            >
-              Get an Anthropic key
-            </a>
-          </p>
-          <input
-            type="password"
-            className={styles.webhookUrlInput}
-            style={{ minHeight: 36, fontFamily: "monospace" }}
-            placeholder="sk-ant-… or sk-…"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void save();
-              }
-              if (e.key === "Escape" && editing) {
-                e.preventDefault();
-                setEditing(false);
-                setInput("");
-                setError(null);
-              }
-            }}
-            disabled={saving}
-          />
-          <div className={styles.apiKeyActions}>
+        )}
+      </p>
+      <div
+        className={`${styles.apiKeyInputRowWrapper} ${showInput ? styles.visible : ""}`}
+      >
+        <div style={{ minHeight: 0 }}>
+          <div className={styles.apiKeyInputRow}>
+            <input
+              type="password"
+              className={styles.apiKeyInput}
+              placeholder="Enter API key…"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void save();
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setEditing(false);
+                  setInput("");
+                  setError(null);
+                }
+              }}
+              disabled={saving}
+              autoFocus
+            />
             <button
               type="button"
               className={styles.apiKeySaveButton}
               onClick={() => void save()}
               disabled={!input.trim() || saving}
             >
-              {saving ? "Saving…" : "Save key"}
+              Save
             </button>
-            {editing && (
-              <button
-                type="button"
-                className={styles.apiKeyCancelButton}
-                onClick={() => {
-                  setEditing(false);
-                  setInput("");
-                  setError(null);
-                }}
-                disabled={saving}
-              >
-                Cancel
-              </button>
-            )}
           </div>
           {error && <p className={styles.apiKeyError}>{error}</p>}
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 }

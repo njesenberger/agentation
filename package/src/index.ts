@@ -21,7 +21,6 @@ export type { DemoAnnotation, AgentationProps } from "./components/page-toolbar-
 export { AnnotationPopupCSS } from "./components/annotation-popup-css";
 export type {
   AnnotationPopupCSSProps,
-  AnnotationPopupCSSHandle,
 } from "./components/annotation-popup-css";
 
 // Icons (same for both versions - they're pure SVG)
