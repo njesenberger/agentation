@@ -4395,7 +4395,13 @@ export function PageFeedbackToolbarCSS({
       >
         {/* Morphing container */}
         <div
-          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${isDraggingToolbar ? styles.dragging : ""} ${toolbarPulse === "edit" ? styles.editPulse : ""} ${toolbarPulse === "resolve" ? styles.resolvePulse : ""}`}
+          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${isDraggingToolbar ? styles.dragging : ""} ${toolbarPulse === "edit" ? styles.editPulse : ""} ${toolbarPulse === "resolve" ? styles.resolvePulse : ""}
+          ${
+            !settings.webhooksEnabled &&
+            (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || ""))
+              ? styles.serverConnected
+              : ""
+          }`}
           onClick={
             !isActive
               ? (e) => {
