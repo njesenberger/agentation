@@ -35,6 +35,13 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+type Anchor = {
+  x: number;
+  y: number;
+  flipsLeft?: boolean;
+  flipsUp?: boolean;
+};
+
 export function BubbleVariant({
   isVisible,
   isDarkMode,
@@ -49,7 +56,7 @@ export function BubbleVariant({
   markerPosition,
 }: BubbleProps) {
   const [input, setInput] = useState("");
-  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [anchor, setAnchor] = useState<Anchor | null>(null);
   const [fakeCursor, setFakeCursor] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -85,6 +92,7 @@ export function BubbleVariant({
     return () => window.removeEventListener("mousemove", onMove);
   }, []);
 
+  // Reset state when bubble closes; set cursor anchor when it opens globally.
   useEffect(() => {
     if (!isVisible) {
       setAnchor(null);
@@ -94,25 +102,8 @@ export function BubbleVariant({
       setHistoryDraft("");
       return;
     }
-    // Element-scoped (placed via marker click): anchor to marker bottom-right,
-    // don't follow the cursor.
-    if (markerPosition) {
-      const MARKER_SIZE = 22;
-      const popupWidth = 220;
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const scrollY = window.scrollY;
-      let x = markerPosition.x + MARKER_SIZE / 2;
-      let y = markerPosition.y + MARKER_SIZE / 2; // document coords
-      // Clamp so bubble doesn't overflow right edge
-      if (x + popupWidth > vw - MARGIN)
-        x = Math.max(MARGIN, vw - popupWidth - MARGIN);
-      // Clamp using viewport coords for overflow check, but store as document coords
-      if (y - scrollY + APPROX_HEIGHT > vh - MARGIN)
-        y = Math.max(scrollY + MARGIN, scrollY + vh - APPROX_HEIGHT - MARGIN);
-      setAnchor({ x, y });
-      return;
-    }
+    if (markerPosition) return; // handled by the layout effect below
+
     // Global cursor bubble: anchor near cursor
     const { x, y } = lastCursor.current;
     const vw = window.innerWidth;
@@ -131,7 +122,46 @@ export function BubbleVariant({
     });
   }, [isVisible, markerPosition]);
 
-  // Only follow the cursor when NOT anchored to a marker
+  // Marker-anchored bubble: recalculate position on every scroll/resize so
+  // the flip direction always reflects the current viewport. useLayoutEffect
+  // commits before paint to avoid visible jumps.
+  useLayoutEffect(() => {
+    if (!isVisible || !markerPosition) return;
+
+    const reposition = () => {
+      const MARKER_SIZE = 22;
+      const popupWidth = 220;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const scrollY = window.scrollY;
+
+      // Prefer bottom; flip to top if not enough space below.
+      const defaultY = markerPosition.y + MARKER_SIZE / 2;
+      const flipsUp = defaultY - scrollY + APPROX_HEIGHT > vh - MARGIN;
+      const y = flipsUp
+        ? markerPosition.y - MARKER_SIZE / 2 - APPROX_HEIGHT
+        : defaultY;
+
+      // Prefer right; flip to left if not enough space on the right.
+      const defaultX = markerPosition.x + MARKER_SIZE / 2;
+      const flipsLeft = defaultX + popupWidth > vw - MARGIN;
+      const x = flipsLeft
+        ? markerPosition.x - MARKER_SIZE / 2 - popupWidth
+        : defaultX;
+
+      setAnchor({ x, y, flipsLeft, flipsUp });
+    };
+
+    reposition();
+    window.addEventListener("scroll", reposition, { passive: true });
+    window.addEventListener("resize", reposition, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", reposition);
+      window.removeEventListener("resize", reposition);
+    };
+  }, [isVisible, markerPosition]);
+
+  // Only follow the cursor when NOT anchored to a marker.
   useEffect(() => {
     if (!isVisible || markerPosition) return;
     const onMove = (e: MouseEvent) => {
@@ -200,11 +230,9 @@ export function BubbleVariant({
       document.removeEventListener("keydown", onKey, { capture: true });
   }, [isVisible, onClose]);
 
-  // Any mousedown is treated as "the operator is moving on" — dismiss the
-  // bubble. The bubble itself is pointer-events:none so clicks pass through
-  // to the page anyway; we just need to catch the intent. Clicks on bubble
-  // descendants with pointer-events:auto (running task pills) still reach
-  // their own handlers first.
+  // Any mousedown outside the bubble is treated as "the operator is moving
+  // on" — dismiss the bubble. The bubble itself is pointer-events:none so
+  // clicks pass through to the page anyway; we just need to catch the intent.
   useEffect(() => {
     if (!isVisible) return;
     const onDown = (e: MouseEvent) => {
@@ -298,7 +326,7 @@ export function BubbleVariant({
     if (typeof next === "string") setInput(next);
   }, [historyIndex, commandHistory]);
 
-  // Auto-size input width using a temporary mirror span
+  // Auto-size input width using a temporary mirror span.
   useLayoutEffect(() => {
     const inp = inputRef.current;
     if (!inp) return;
@@ -333,17 +361,22 @@ export function BubbleVariant({
 
   if (!anchor) return null;
 
+  const anchorLabel = `${anchor.flipsUp ? "top" : "bottom"}-${anchor.flipsLeft ? "left" : "right"}`;
+
   return (
     <>
       <div
         ref={rootRef}
         className={`${styles.bubble} ${!isDarkMode ? styles.light : ""} ${isVisible ? styles.enter : styles.exit}`}
         style={{
-          left: anchor.x,
+          ...(anchor.flipsLeft
+            ? { right: window.innerWidth - anchor.x - APPROX_WIDTH }
+            : { left: anchor.x }),
           top: anchor.y,
           position: markerPosition ? "absolute" : undefined,
         }}
         data-feedback-toolbar
+        data-anchor={markerPosition ? anchorLabel : undefined}
       >
         <div className={styles.body}>
           {/* Element-scoped chip removed in v2 — the persistent element label
@@ -368,8 +401,8 @@ export function BubbleVariant({
               e.stopPropagation();
               if (e.key === "Enter") {
                 e.preventDefault();
-                // When onSubmit is provided (element-scoped annotation), bypass API key
-                // check entirely — we're just saving an annotation, not calling the agent.
+                // When onSubmit is provided (element-scoped annotation), bypass
+                // API key check entirely — we're just saving an annotation.
                 if (needsApiKey && !onSubmit) {
                   onOpenSettings();
                   return;

@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useRef, useCallback, useLayoutEffect } from "react";
+import {
+  useState,
+  useRef,
+  useCallback,
+  useLayoutEffect,
+  forwardRef,
+} from "react";
 import styles from "./styles.module.scss";
 import { IconTrash } from "../icons";
 import { originalSetTimeout } from "../../utils/freeze-animations";
@@ -59,127 +65,147 @@ export interface AnnotationPopupCSSProps {
   lightMode?: boolean;
   /** Computed styles for the selected element */
   computedStyles?: Record<string, string>;
+  /** Popup corner position indicator */
+  "data-popup-corner"?:
+    | "bottom-right"
+    | "bottom-left"
+    | "top-right"
+    | "top-left";
 }
 
 // =============================================================================
 // Component
 // =============================================================================
 
-export const AnnotationPopupCSS = ({
-  placeholder = "What should change?",
-  initialValue = "",
-  onSubmit,
-  onSubmitToAgent,
-  onCancel,
-  onDelete,
-  style,
-  accentColor = "#3c82f7",
-}: AnnotationPopupCSSProps) => {
-  const [text, setText] = useState(initialValue);
-  const [isFocused, setIsFocused] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+export const AnnotationPopupCSS = forwardRef<
+  HTMLDivElement,
+  AnnotationPopupCSSProps
+>(
+  (
+    {
+      placeholder = "What should change?",
+      initialValue = "",
+      onSubmit,
+      onSubmitToAgent,
+      onCancel,
+      onDelete,
+      style,
+      accentColor = "#3c82f7",
+      "data-popup-corner": popupCorner,
+    },
+    ref,
+  ) => {
+    const [text, setText] = useState(initialValue);
+    const [isFocused, setIsFocused] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Auto-size input width using a temporary mirror span
-  useLayoutEffect(() => {
-    const inp = inputRef.current;
-    if (!inp) return;
+    // Auto-size input width using a temporary mirror span
+    useLayoutEffect(() => {
+      const inp = inputRef.current;
+      if (!inp) return;
 
-    const measure = () => {
-      const mirror = document.createElement("span");
-      mirror.style.position = "absolute";
-      mirror.style.top = "-9999px";
-      mirror.style.left = "-9999px";
-      mirror.style.visibility = "hidden";
-      mirror.style.whiteSpace = "pre";
-      mirror.style.pointerEvents = "none";
-      document.body.appendChild(mirror);
+      const measure = () => {
+        const mirror = document.createElement("span");
+        mirror.style.position = "absolute";
+        mirror.style.top = "-9999px";
+        mirror.style.left = "-9999px";
+        mirror.style.visibility = "hidden";
+        mirror.style.whiteSpace = "pre";
+        mirror.style.pointerEvents = "none";
+        document.body.appendChild(mirror);
 
-      const cs = window.getComputedStyle(inp);
-      mirror.style.font = cs.font;
-      mirror.style.letterSpacing = cs.letterSpacing;
-      mirror.textContent = text || placeholder;
+        const cs = window.getComputedStyle(inp);
+        mirror.style.font = cs.font;
+        mirror.style.letterSpacing = cs.letterSpacing;
+        mirror.textContent = text || placeholder;
 
-      const paddingLeft = parseFloat(cs.paddingLeft);
-      const paddingRight = parseFloat(cs.paddingRight);
-      const w = Math.min(mirror.offsetWidth + paddingLeft + paddingRight, 200);
-      inp.style.width = `${w}px`;
+        const paddingLeft = parseFloat(cs.paddingLeft);
+        const paddingRight = parseFloat(cs.paddingRight);
+        const w = Math.min(
+          mirror.offsetWidth + paddingLeft + paddingRight,
+          200,
+        );
+        inp.style.width = `${w}px`;
 
-      document.body.removeChild(mirror);
-    };
+        document.body.removeChild(mirror);
+      };
 
-    measure();
-    const raf = requestAnimationFrame(measure);
-    return () => cancelAnimationFrame(raf);
-  }, [text, placeholder]);
+      measure();
+      const raf = requestAnimationFrame(measure);
+      return () => cancelAnimationFrame(raf);
+    }, [text, placeholder]);
 
-  // Handle cancel with exit animation
-  const handleCancel = useCallback(() => {
-    cancelTimerRef.current = originalSetTimeout(() => {
-      onCancel();
-    }, 150); // Match exit animation duration
-  }, [onCancel]);
+    // Handle cancel with exit animation
+    const handleCancel = useCallback(() => {
+      cancelTimerRef.current = originalSetTimeout(() => {
+        onCancel();
+      }, 150); // Match exit animation duration
+    }, [onCancel]);
 
-  // Handle submit
-  const handleSubmit = useCallback(() => {
-    if (!text.trim()) return;
-    onSubmit(text.trim());
-  }, [text, onSubmit]);
+    // Handle submit
+    const handleSubmit = useCallback(() => {
+      if (!text.trim()) return;
+      onSubmit(text.trim());
+    }, [text, onSubmit]);
 
-  // Handle keyboard
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      e.stopPropagation();
-      if (e.nativeEvent.isComposing) return;
-      if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && onSubmitToAgent) {
-        e.preventDefault();
-        if (!text.trim()) {
-          onDelete?.();
+    // Handle keyboard
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent<HTMLInputElement>) => {
+        e.stopPropagation();
+        if (e.nativeEvent.isComposing) return;
+        if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && onSubmitToAgent) {
+          e.preventDefault();
+          if (!text.trim()) {
+            onDelete?.();
+            return;
+          }
+          onSubmitToAgent(text.trim());
           return;
         }
-        onSubmitToAgent(text.trim());
-        return;
-      }
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit();
-      }
-      if (e.key === "Escape") {
-        handleCancel();
-      }
-    },
-    [handleSubmit, handleCancel, onSubmitToAgent, text],
-  );
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          handleSubmit();
+        }
+        if (e.key === "Escape") {
+          handleCancel();
+        }
+      },
+      [handleSubmit, handleCancel, onSubmitToAgent, text],
+    );
 
-  return (
-    <div
-      className={styles.wrapper}
-      style={style}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className={styles.container}>
-        <button
-          className={styles.removeButton}
-          onClick={onDelete}
-          type="button"
-        >
-          <IconTrash />
-        </button>
-        <input
-          ref={inputRef}
-          className={styles.input}
-          style={{ borderColor: isFocused ? accentColor : undefined }}
-          placeholder={placeholder}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          onKeyDown={handleKeyDown}
-          autoFocus
-        />
+    return (
+      <div
+        ref={ref}
+        className={styles.wrapper}
+        data-popup-corner={popupCorner}
+        style={style}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={styles.container}>
+          <button
+            className={styles.removeButton}
+            onClick={onDelete}
+            type="button"
+          >
+            <IconTrash />
+          </button>
+          <input
+            ref={inputRef}
+            className={styles.input}
+            style={{ borderColor: isFocused ? accentColor : undefined }}
+            placeholder={placeholder}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            onKeyDown={handleKeyDown}
+            autoFocus
+          />
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  },
+);
 
 export default AnnotationPopupCSS;

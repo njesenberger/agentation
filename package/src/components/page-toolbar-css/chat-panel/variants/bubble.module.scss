@@ -59,8 +59,24 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border-radius: 4px 19px 19px;
+  border-radius: 19px;
   background-color: currentColor;
+
+  .bubble[data-anchor="bottom-right"] & {
+    border-top-left-radius: 4px;
+  }
+
+  .bubble[data-anchor="top-right"] & {
+    border-bottom-left-radius: 4px;
+  }
+
+  .bubble[data-anchor="bottom-left"] & {
+    border-top-right-radius: 4px;
+  }
+
+  .bubble[data-anchor="top-left"] & {
+    border-bottom-right-radius: 4px;
+  }
 }
 
 // =============================================================================
