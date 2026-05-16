@@ -5327,7 +5327,6 @@ export function PageFeedbackToolbarCSS({
                 isEditingAny={!!editingAnnotation}
                 renumberFrom={renumberFrom}
                 markerClickBehavior={settings.markerClickBehavior}
-                // tooltipStyle={getTooltipPosition(annotation)}
                 agentStatus={agentMarkerStates.get(annotation.id)}
                 onHoverEnter={(a) =>
                   !markersExiting &&
@@ -5375,7 +5374,6 @@ export function PageFeedbackToolbarCSS({
                 isEditingAny={!!editingAnnotation}
                 renumberFrom={renumberFrom}
                 markerClickBehavior={settings.markerClickBehavior}
-                // tooltipStyle={getTooltipPosition(annotation)}
                 agentStatus={agentMarkerStates.get(annotation.id)}
                 onHoverEnter={(a) =>
                   !markersExiting &&
@@ -5759,41 +5757,10 @@ export function PageFeedbackToolbarCSS({
                     ? "var(--agentation-color-green)"
                     : "var(--agentation-color-accent)"
                 }
-                style={(() => {
-                  const markerSize = 22;
-                  const popupWidth = 280;
-                  const popupEstHeight = 290;
-                  const viewportW = window.innerWidth;
-                  const viewportH = window.innerHeight;
-
-                  const markerX = (editingAnnotation.x / 100) * viewportW;
-                  const markerY = editingAnnotation.isFixed
-                    ? editingAnnotation.y
-                    : editingAnnotation.y - scrollY;
-
-                  // Anchor popup top-left to marker bottom-right corner
-                  let left = markerX + markerSize / 2;
-                  let top = markerY + markerSize / 2;
-
-                  // Clamp horizontally so popup doesn't overflow the right edge
-                  if (left + popupWidth > viewportW - 12) {
-                    left = Math.max(12, viewportW - popupWidth - 12);
-                  }
-
-                  // Flip above the marker if there isn't enough space below
-                  const useAbove = top + popupEstHeight > viewportH - 12;
-
-                  return {
-                    left,
-                    transform: "none",
-                    ...(useAbove
-                      ? {
-                          bottom: viewportH - markerY - markerSize,
-                          top: "auto",
-                        }
-                      : { top }),
-                  };
-                })()}
+                markerPosition={{
+                  x: (editingAnnotation.x / 100) * window.innerWidth,
+                  y: editingAnnotation.y as number,
+                }}
               />
             </>
           )}

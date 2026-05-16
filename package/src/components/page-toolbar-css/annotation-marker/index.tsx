@@ -1,3 +1,4 @@
+import { useState, useRef, useLayoutEffect } from "react";
 import { Annotation } from "../../../types";
 import { IconCheck, IconEdit, IconPlus, IconXmark } from "../../icons";
 import styles from "./styles.module.scss";
@@ -24,7 +25,6 @@ type AnnotationMarkerProps = {
   isEditingAny: boolean;
   renumberFrom: number | null;
   markerClickBehavior: MarkerClickBehavior;
-  tooltipStyle?: React.CSSProperties;
   agentStatus?: AnnotationMarkerAgentStatus;
   onHoverEnter: (annotation: Annotation) => void;
   onHoverLeave: () => void;
@@ -45,13 +45,46 @@ export function AnnotationMarker({
   isEditingAny,
   renumberFrom,
   markerClickBehavior,
-  tooltipStyle,
   agentStatus,
   onHoverEnter,
   onHoverLeave,
   onClick,
   onContextMenu,
 }: AnnotationMarkerProps) {
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [flipsUp, setFlipsUp] = useState(false);
+  const [flipsLeft, setFlipsLeft] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!isHovered) return;
+
+    const reposition = () => {
+      const el = tooltipRef.current;
+      if (!el) return;
+
+      const markerX = (annotation.x / 100) * window.innerWidth;
+      const tooltipWidth = el.offsetWidth;
+      const tooltipHeight = el.offsetHeight;
+
+      setFlipsLeft(markerX + tooltipWidth > window.innerWidth - 8);
+      setFlipsUp(
+        (annotation.y as number) - window.scrollY + tooltipHeight >
+          window.innerHeight - 8,
+      );
+    };
+
+    const raf = requestAnimationFrame(reposition);
+    window.addEventListener("scroll", reposition, { passive: true });
+    window.addEventListener("resize", reposition, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", reposition);
+      window.removeEventListener("resize", reposition);
+    };
+  }, [isHovered, annotation.x, annotation.y]);
+
+  const tooltipAnchorLabel = `${flipsUp ? "top" : "bottom"}-${flipsLeft ? "left" : "right"}`;
+
   const showDeleteState = (isHovered || isDeleting) && !isEditingAny;
   const showDeleteHover = showDeleteState && markerClickBehavior === "delete";
   const isMulti = annotation.isMultiSelect;
@@ -123,7 +156,11 @@ export function AnnotationMarker({
       )}
 
       {isHovered && !isEditingAny && (
-        <div className={`${styles.markerTooltip} ${styles.enter}`}>
+        <div
+          ref={tooltipRef}
+          className={`${styles.markerTooltip} ${styles.enter}`}
+          data-anchor={tooltipAnchorLabel}
+        >
           {annotation.comment}
         </div>
       )}

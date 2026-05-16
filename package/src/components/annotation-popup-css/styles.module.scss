@@ -18,7 +18,6 @@
 .removeButton {
   position: absolute;
   top: -10px;
-  right: -8px;
   border-radius: 50%;
   width: 22px;
   height: 22px;
@@ -26,6 +25,14 @@
   color: #fff;
   transition-property: transform, opacity;
   transition-duration: 0.15s;
+
+  .wrapper[data-anchor$="left"] & {
+    left: -8px;
+  }
+
+  .wrapper[data-anchor$="right"] & {
+    right: -8px;
+  }
 
   @starting-style {
     transform: scale(0.8);
@@ -45,7 +52,7 @@
 .input {
   outline: none;
   border: none;
-  border-radius: 4px 19px 19px;
+  border-radius: 19px;
   padding: 10px 16px 10px 14px;
   width: 100%;
   max-width: 100%;
@@ -58,4 +65,20 @@
   font: inherit;
   color: inherit;
   text-overflow: ellipsis;
+
+  [data-anchor="bottom-right"] & {
+    border-top-left-radius: 4px;
+  }
+
+  [data-anchor="top-right"] & {
+    border-bottom-left-radius: 4px;
+  }
+
+  [data-anchor="bottom-left"] & {
+    border-top-right-radius: 4px;
+  }
+
+  [data-anchor="top-left"] & {
+    border-bottom-right-radius: 4px;
+  }
 }
