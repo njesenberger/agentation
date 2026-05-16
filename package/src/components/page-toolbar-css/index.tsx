@@ -4275,11 +4275,13 @@ export function PageFeedbackToolbarCSS({
   const hoverLabelRef = useRef<HTMLDivElement>(null);
 
   const [labelHeight, setLabelHeight] = useState(0);
+  const [labelWidth, setLabelWidth] = useState(0);
 
   useLayoutEffect(() => {
     if (!hoverLabelRef.current) return;
     setLabelHeight(hoverLabelRef.current.offsetHeight);
-  }, [altHeld]);
+    setLabelWidth(hoverLabelRef.current.offsetWidth);
+  }, [altHeld, hoverInfo]);
 
   if (!mounted) return null;
   if (isToolbarHidden) return null;
@@ -4994,10 +4996,12 @@ export function PageFeedbackToolbarCSS({
               const vv = window.visualViewport;
               const offsetLeft = isSafari ? (vv?.offsetLeft ?? 0) : 0;
               const width = window.innerWidth;
+              const w = labelWidth;
+              const edgePadding = 12;
 
               return Math.max(
-                8,
-                Math.min(hoverPosition.x + offsetLeft, width - 100),
+                edgePadding,
+                Math.min(hoverPosition.x + offsetLeft, width - w - edgePadding),
               );
             })(),
 
