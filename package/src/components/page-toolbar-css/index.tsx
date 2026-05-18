@@ -480,7 +480,6 @@ export function PageFeedbackToolbarCSS({
   const [settingsPage, setSettingsPage] = useState<"main" | "automations">(
     "main",
   );
-  const [tooltipsHidden, setTooltipsHidden] = useState(false);
 
   // Layout mode state
   const [isDesignMode, setIsDesignMode] = useState(false);
@@ -564,14 +563,7 @@ export function PageFeedbackToolbarCSS({
     null,
   );
   const drawCanvasRef = useRef<HTMLCanvasElement>(null);
-  const isDrawingRef = useRef(false);
-  const currentStrokeRef = useRef<Array<{ x: number; y: number }>>([]);
-  const dimAmountRef = useRef(0);
-  const visualHighlightRef = useRef<number | null>(null);
-  const exitingStrokeIdRef = useRef<string | null>(null);
-  const exitingAlphaRef = useRef(1);
 
-  const [tooltipSessionActive, setTooltipSessionActive] = useState(false);
   const tooltipSessionTimerRef = useRef<ReturnType<
     typeof originalSetTimeout
   > | null>(null);
@@ -587,33 +579,6 @@ export function PageFeedbackToolbarCSS({
     }>
   >([]);
   const modifiersHeldRef = useRef({ cmd: false, shift: false });
-
-  // Hide tooltips after button click until mouse leaves
-  const hideTooltipsUntilMouseLeave = () => {
-    setTooltipsHidden(true);
-  };
-
-  const showTooltipsAgain = () => {
-    setTooltipsHidden(false);
-  };
-
-  const handleControlsMouseEnter = () => {
-    if (!tooltipSessionActive) {
-      tooltipSessionTimerRef.current = originalSetTimeout(
-        () => setTooltipSessionActive(true),
-        850,
-      );
-    }
-  };
-
-  const handleControlsMouseLeave = () => {
-    if (tooltipSessionTimerRef.current) {
-      clearTimeout(tooltipSessionTimerRef.current);
-      tooltipSessionTimerRef.current = null;
-    }
-    setTooltipSessionActive(false);
-    showTooltipsAgain();
-  };
 
   useEffect(() => {
     return () => {
@@ -719,7 +684,6 @@ export function PageFeedbackToolbarCSS({
       setShowSettingsVisible(true);
     } else {
       // Reset tooltips when settings close (fixes tooltips not showing after closing settings)
-      setTooltipsHidden(false);
       // Reset to main page when settings close
       setSettingsPage("main");
       const timer = originalSetTimeout(() => setShowSettingsVisible(false), 0);
@@ -3451,6 +3415,10 @@ export function PageFeedbackToolbarCSS({
       // Start dragging once threshold is exceeded
       if (!isDraggingToolbar && distance > DRAG_THRESHOLD) {
         setIsDraggingToolbar(true);
+        window.addEventListener("click", (e) => e.stopPropagation(), {
+          capture: true,
+          once: true,
+        });
       }
 
       if (isDraggingToolbar || distance > DRAG_THRESHOLD) {
@@ -3511,11 +3479,13 @@ export function PageFeedbackToolbarCSS({
   const handleToolbarMouseDown = useCallback(
     (e: React.MouseEvent) => {
       // Only drag when clicking the toolbar background (not buttons or settings)
-      if (
-        (e.target as HTMLElement).closest("button") ||
-        (e.target as HTMLElement).closest("[data-agentation-settings-panel]")
-      ) {
-        return;
+      if (isActive) {
+        if (
+          (e.target as HTMLElement).closest("button") ||
+          (e.target as HTMLElement).closest("[data-agentation-settings-panel]")
+        ) {
+          return;
+        }
       }
 
       // Don't prevent default yet - let onClick work for collapsed state
@@ -3536,7 +3506,7 @@ export function PageFeedbackToolbarCSS({
       });
       // Don't set isDraggingToolbar yet - wait for actual movement
     },
-    [toolbarPosition],
+    [toolbarPosition, isActive],
   );
 
   // Keep toolbar in view on window resize and when toolbar expands/collapses
@@ -3619,7 +3589,6 @@ export function PageFeedbackToolbarCSS({
         if (pendingAnnotation) {
           // Let popup handle
         } else if (isActive) {
-          hideTooltipsUntilMouseLeave();
           setIsActive(false);
         }
       }
@@ -3631,7 +3600,6 @@ export function PageFeedbackToolbarCSS({
         (e.key === "f" || e.key === "F")
       ) {
         e.preventDefault();
-        hideTooltipsUntilMouseLeave();
         if (isActive) {
           deactivate();
         } else {
@@ -3646,14 +3614,12 @@ export function PageFeedbackToolbarCSS({
       // "P" to toggle pause/freeze
       if (e.key === "p" || e.key === "P") {
         e.preventDefault();
-        hideTooltipsUntilMouseLeave();
         toggleFreeze();
       }
 
       // "L" to toggle layout mode
       if (e.key === "l" || e.key === "L") {
         e.preventDefault();
-        hideTooltipsUntilMouseLeave();
         if (isDrawMode) setIsDrawMode(false);
         if (showSettings) setShowSettings(false);
         if (pendingAnnotation) cancelAnnotation();
@@ -3668,7 +3634,6 @@ export function PageFeedbackToolbarCSS({
       if (e.key === "h" || e.key === "H") {
         if (annotations.length > 0) {
           e.preventDefault();
-          hideTooltipsUntilMouseLeave();
           setShowMarkers((prev) => !prev);
         }
       }
@@ -3681,7 +3646,6 @@ export function PageFeedbackToolbarCSS({
           rearrangeState
         ) {
           e.preventDefault();
-          hideTooltipsUntilMouseLeave();
           copyOutput();
         }
       }
@@ -3694,7 +3658,6 @@ export function PageFeedbackToolbarCSS({
           rearrangeState
         ) {
           e.preventDefault();
-          hideTooltipsUntilMouseLeave();
           clearAll();
           if (designPlacements.length > 0) setDesignPlacements([]);
           if (rearrangeState) setRearrangeState(null);
@@ -3710,7 +3673,6 @@ export function PageFeedbackToolbarCSS({
           hasValidWebhook /*&& sendState === "idle"*/
         ) {
           e.preventDefault();
-          hideTooltipsUntilMouseLeave();
           sendToWebhook();
         }
       }
@@ -3746,12 +3708,11 @@ export function PageFeedbackToolbarCSS({
       a.kind !== "placement" &&
       a.kind !== "rearrange",
   );
-  const hasVisibleAnnotations = visibleAnnotations.length > 0;
+
   const exitingAnnotationsList = annotations.filter((a) =>
     exitingMarkers.has(a.id),
   );
 
-  // Helper function to calculate viewport-aware tooltip positioning
   // Helper function to calculate viewport-aware tooltip positioning
   const getTooltipPosition = (annotation: Annotation): React.CSSProperties => {
     // Tooltip dimensions (from CSS)
@@ -3842,6 +3803,7 @@ export function PageFeedbackToolbarCSS({
           setShowSettings(!showSettings);
         }}
         mcpConnected={connectionStatus === "connected"}
+        onMouseDown={handleToolbarMouseDown}
       >
         <DesignPalette
           visible={isDesignMode && isActive}
